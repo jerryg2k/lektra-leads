@@ -53,3 +53,14 @@
 - [x] Vitest: CSV escape utility tests (5 tests)
 - [x] Vitest: auth logout test (1 test)
 - [x] All 21 tests passing
+
+## Lead Discovery Engine (new feature)
+- [x] Discover page with search controls (keywords, industry, funding stage, headcount)
+- [x] Server-side discovery router using LinkedIn company details API
+- [x] LinkedIn people search for founders/CEOs at discovered companies
+- [x] LLM-powered Lektra fit analysis for each discovered company
+- [x] Auto-scoring of discovered companies using existing scoring engine
+- [x] One-click "Add to Leads" from discovery results
+- [x] Duplicate detection (skip companies already in leads database)
+- [x] Discovery results display with score, fit reason, and LinkedIn links
+- [x] Curated seed list of 70+ known AI GPU startup LinkedIn slugs for reliable discovery

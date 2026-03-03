@@ -25,6 +25,7 @@ import {
   getRecommendedGpu,
   scoreLead,
 } from "./scoring";
+import { discoverRouter } from "./routers/discover";
 
 // ─── Zod Schemas ──────────────────────────────────────────────────────────────
 
@@ -257,6 +258,8 @@ export const appRouter = router({
       return { success: true } as const;
     }),
   }),
+
+  discover: discoverRouter,
 
   // ─── Leads ──────────────────────────────────────────────────────────────────
 

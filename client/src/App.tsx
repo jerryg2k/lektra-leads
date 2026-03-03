@@ -7,7 +7,8 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Dashboard from "./pages/Dashboard";
 import LeadDetail from "./pages/LeadDetail";
 import LeadsList from "./pages/LeadsList";
-import Pipeline from "./pages/Pipeline";
+import Pipeline from "@/pages/Pipeline";
+import Discover from "@/pages/Discover";
 import Import from "./pages/Import";
 
 function Router() {
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/leads" component={LeadsList} />
       <Route path="/leads/:id" component={LeadDetail} />
       <Route path="/pipeline" component={Pipeline} />
+      <Route path="/discover" component={Discover} />
       <Route path="/import" component={Import} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
