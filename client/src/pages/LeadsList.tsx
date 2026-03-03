@@ -161,36 +161,36 @@ export default function LeadsList() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-card rounded-xl border border-border">
             <div>
               <Label className="text-xs text-muted-foreground mb-1.5 block">Industry</Label>
-              <Select value={industry ?? ""} onValueChange={(v) => setIndustry(v || undefined)}>
+              <Select value={industry ?? "all"} onValueChange={(v) => setIndustry(v === "all" ? undefined : v)}>
                 <SelectTrigger className="bg-secondary border-border text-sm h-9">
                   <SelectValue placeholder="All industries" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border">
-                  <SelectItem value="">All industries</SelectItem>
+                  <SelectItem value="all">All industries</SelectItem>
                   {INDUSTRIES.map((i) => <SelectItem key={i} value={i}>{i}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-xs text-muted-foreground mb-1.5 block">Funding Stage</Label>
-              <Select value={fundingStage ?? ""} onValueChange={(v) => setFundingStage(v || undefined)}>
+              <Select value={fundingStage ?? "all"} onValueChange={(v) => setFundingStage(v === "all" ? undefined : v)}>
                 <SelectTrigger className="bg-secondary border-border text-sm h-9">
                   <SelectValue placeholder="All stages" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border">
-                  <SelectItem value="">All stages</SelectItem>
+                  <SelectItem value="all">All stages</SelectItem>
                   {FUNDING_STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-xs text-muted-foreground mb-1.5 block">Pipeline Stage</Label>
-              <Select value={pipelineStage ?? ""} onValueChange={(v) => setPipelineStage(v || undefined)}>
+              <Select value={pipelineStage ?? "all"} onValueChange={(v) => setPipelineStage(v === "all" ? undefined : v)}>
                 <SelectTrigger className="bg-secondary border-border text-sm h-9">
                   <SelectValue placeholder="All pipeline" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border">
-                  <SelectItem value="">All pipeline</SelectItem>
+                  <SelectItem value="all">All pipeline</SelectItem>
                   {PIPELINE_STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -198,14 +198,14 @@ export default function LeadsList() {
             <div>
               <Label className="text-xs text-muted-foreground mb-1.5 block">Min Score</Label>
               <Select
-                value={minScore?.toString() ?? ""}
-                onValueChange={(v) => setMinScore(v ? Number(v) : undefined)}
+                value={minScore?.toString() ?? "all"}
+                onValueChange={(v) => setMinScore(v === "all" ? undefined : Number(v))}
               >
                 <SelectTrigger className="bg-secondary border-border text-sm h-9">
                   <SelectValue placeholder="Any score" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border">
-                  <SelectItem value="">Any score</SelectItem>
+                  <SelectItem value="all">Any score</SelectItem>
                   <SelectItem value="75">Hot (75+)</SelectItem>
                   <SelectItem value="50">Warm (50+)</SelectItem>
                   <SelectItem value="25">Cool (25+)</SelectItem>
