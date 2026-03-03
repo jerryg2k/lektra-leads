@@ -21,15 +21,17 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
+import { BarChart3, Building2, Kanban, LogOut, PanelLeft, Plus, Upload } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Page 1", path: "/" },
-  { icon: Users, label: "Page 2", path: "/some-path" },
+  { icon: BarChart3, label: "Dashboard", path: "/" },
+  { icon: Building2, label: "Leads", path: "/leads" },
+  { icon: Kanban, label: "Pipeline", path: "/pipeline" },
+  { icon: Upload, label: "Import", path: "/import" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -163,16 +165,17 @@ function DashboardLayoutContent({
             <div className="flex items-center gap-3 px-2 transition-all w-full">
               <button
                 onClick={toggleSidebar}
-                className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
+                className="h-8 w-8 flex items-center justify-center hover:bg-accent/20 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
                 aria-label="Toggle navigation"
               >
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-semibold tracking-tight truncate">
-                    Navigation
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="font-bold tracking-tight text-primary text-base leading-none">Lektra</span>
+                    <span className="text-[10px] text-muted-foreground leading-none mt-0.5">Lead Intelligence</span>
+                  </div>
                 </div>
               ) : null}
             </div>
