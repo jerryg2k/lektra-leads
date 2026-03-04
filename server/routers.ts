@@ -15,8 +15,10 @@ import {
   getLeads,
   getNotesByLeadId,
   getPipelineStats,
+  getUserSettings,
   updateContact,
   updateLead,
+  upsertUserSettings,
 } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -266,6 +268,26 @@ export const appRouter = router({
   }),
 
   discover: discoverRouter,
+
+  // ─── Settings ───────────────────────────────────────────────────────────────
+
+  settings: router({
+    get: protectedProcedure.query(async ({ ctx }) => {
+      const s = await getUserSettings(ctx.user.openId);
+      return s ?? { digestHour: 7, digestTimezone: "UTC", digestDayOfWeek: 1, digestEnabled: true };
+    }),
+    update: protectedProcedure
+      .input(z.object({
+        digestHour: z.number().min(0).max(23).optional(),
+        digestTimezone: z.string().optional(),
+        digestDayOfWeek: z.number().min(0).max(6).optional(),
+        digestEnabled: z.boolean().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await upsertUserSettings(ctx.user.openId, input);
+        return { success: true };
+      }),
+  }),
 
   // ─── Leads ──────────────────────────────────────────────────────────────────
 

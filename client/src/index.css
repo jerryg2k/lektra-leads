@@ -89,8 +89,23 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    /* Larger base font for tablet/mobile readability (Galaxy Tab, etc.) */
+    font-size: 16px;
+  }
+  @media (min-width: 768px) {
+    html {
+      font-size: 17px;
+    }
+  }
+  @media (min-width: 1024px) {
+    html {
+      font-size: 16px;
+    }
+  }
   body {
     @apply bg-background text-foreground;
+    line-height: 1.6;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),

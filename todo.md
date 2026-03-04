@@ -101,23 +101,29 @@
 - [x] HubSpot export: "Preview Count" button shows matching lead count before download
 
 ## Email Sequences, Analytics & AI Strategy (new batch)
-- [ ] Feature 1: Follow-up email sequences — "Start Sequence" button on Lead Detail
-- [ ] Feature 1: emailSequences table (leadId, contactId, day, subject, body, status, scheduledAt, sentAt)
-- [ ] Feature 1: sequences.create procedure — generates Day 1/4/10 email drafts via LLM
-- [ ] Feature 1: sequences.list procedure — returns all sequences for a lead
-- [ ] Feature 1: sequences.updateStatus procedure — mark as Sent / Skipped
-- [ ] Feature 1: Sequence UI on Lead Detail — timeline view of Day 1/4/10 emails with copy/edit/mark-sent
-- [ ] Feature 2: Lead source analytics — bar/donut chart on Dashboard (LinkedIn / Apollo / Manual / Discovered)
-- [ ] Feature 2: Average score per source shown alongside count
-- [ ] Feature 3: AI Strategy Advisor — "Get Strategy" button on Lead Detail notes section
-- [ ] Feature 3: Server procedure: analyzeLeadStrategy — reads all notes + lead data, returns structured strategy
-- [ ] Feature 3: Strategy output: engagement summary, recommended next action, talking points, objection handlers
-- [ ] Feature 3: Strategy panel rendered with Streamdown markdown on Lead Detail page
+- [x] Feature 1: Follow-up email sequences — "Start Sequence" button on Lead Detail
+- [x] Feature 1: emailSequences table (leadId, contactId, day, subject, body, status, scheduledAt, sentAt)
+- [x] Feature 1: sequences.create procedure — generates Day 1/4/10 email drafts via LLM
+- [x] Feature 1: sequences.list procedure — returns all sequences for a lead
+- [x] Feature 1: sequences.updateStatus procedure — mark as Sent / Skipped
+- [x] Feature 1: Sequence UI on Lead Detail — timeline view of Day 1/4/10 emails with copy/edit/mark-sent
+- [x] Feature 2: Lead source analytics — bar/donut chart on Dashboard (LinkedIn / Apollo / Manual / Discovered)
+- [x] Feature 2: Average score per source shown alongside count
+- [x] Feature 3: AI Strategy Advisor — "Get Strategy" button on Lead Detail notes section
+- [x] Feature 3: Server procedure: analyzeLeadStrategy — reads all notes + lead data, returns structured strategy
+- [x] Feature 3: Strategy output: engagement summary, recommended next action, talking points, objection handlers
+- [x] Feature 3: Strategy panel rendered with Streamdown markdown on Lead Detail page
 
 ## Notes UX + Automation Batch (new)
-- [ ] Edit notes inline in activity log (pencil icon, inline textarea, save/cancel)
-- [ ] Delete notes with confirmation dialog
-- [ ] Word wrap for long note text (no truncation, whitespace-pre-wrap)
-- [ ] Auto-log note when sequence email step is marked sent
-- [ ] Auto-run strategy analysis invalidation when a note is saved
-- [ ] Weekly BD digest email every Monday 8am (scheduled, top overdue + new leads summary)
+- [x] Edit notes inline in activity log (pencil icon, inline textarea, save/cancel)
+- [x] Delete notes with confirmation dialog
+- [x] Word wrap for long note text (no truncation, whitespace-pre-wrap)
+- [x] Auto-log note when sequence email step is marked sent
+- [x] Auto-run strategy analysis invalidation when a note is saved
+- [x] Weekly BD digest email every Monday 8am (scheduled, top overdue + new leads summary)
+
+## Font Size + Quick Actions + Note Templates + Digest Settings
+- [x] Increase base font size globally (Galaxy Tab readability)
+- [x] Note templates quick-fill dropdown (Left voicemail, Sent intro email, Demo scheduled, etc.)
+- [x] Lead card quick-actions: Log Call, Move Stage, Schedule Follow-up without opening detail page
+- [x] Digest timezone preference settings page

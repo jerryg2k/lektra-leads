@@ -147,3 +147,23 @@ export const emailSequences = mysqlTable("emailSequences", {
 
 export type EmailSequence = typeof emailSequences.$inferSelect;
 export type InsertEmailSequence = typeof emailSequences.$inferInsert;
+
+// ─── User Settings ────────────────────────────────────────────────────────────
+
+export const userSettings = mysqlTable("userSettings", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: varchar("userId", { length: 64 }).notNull().unique(),
+  // Digest delivery preferences
+  digestHour: int("digestHour").default(7).notNull(),
+  // Hour in 24h format (0-23)
+  digestTimezone: varchar("digestTimezone", { length: 64 }).default("UTC").notNull(),
+  // IANA timezone string e.g. "America/New_York"
+  digestDayOfWeek: int("digestDayOfWeek").default(1).notNull(),
+  // 0=Sun, 1=Mon, ..., 6=Sat
+  digestEnabled: boolean("digestEnabled").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type UserSettings = typeof userSettings.$inferSelect;
+export type InsertUserSettings = typeof userSettings.$inferInsert;

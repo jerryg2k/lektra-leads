@@ -1,6 +1,6 @@
 import { and, desc, eq, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { contacts, InsertContact, InsertLead, InsertNote, InsertUser, leads, notes, users } from "../drizzle/schema";
+import { contacts, InsertContact, InsertLead, InsertNote, InsertUser, InsertUserSettings, leads, notes, userSettings, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -239,4 +239,22 @@ export async function getPipelineStats() {
     .from(leads)
     .where(eq(leads.isArchived, false))
     .groupBy(leads.pipelineStage);
+}
+
+// ─── User Settings ────────────────────────────────────────────────────────────
+
+export async function getUserSettings(userId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function upsertUserSettings(userId: string, data: Partial<InsertUserSettings>) {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .insert(userSettings)
+    .values({ userId, digestHour: 7, digestTimezone: "UTC", digestDayOfWeek: 1, digestEnabled: true, ...data })
+    .onDuplicateKeyUpdate({ set: data });
 }

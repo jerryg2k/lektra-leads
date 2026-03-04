@@ -45,6 +45,19 @@ import { useLocation, useParams } from "wouter";
 const PIPELINE_STAGES = ["New", "Contacted", "Qualified", "Closed Won", "Closed Lost"] as const;
 const NOTE_TYPES = ["Note", "Call", "Email", "Meeting", "Follow-up"] as const;
 
+const NOTE_TEMPLATES: { label: string; type: string; text: string }[] = [
+  { label: "Left voicemail", type: "Call", text: "Left voicemail — introduced Lektra Cloud GPU rental offering. Mentioned 30-50% savings vs hyperscalers. Will follow up in 2 days." },
+  { label: "Sent intro email", type: "Email", text: "Sent intro email introducing Lektra Cloud and our H200/RTX Pro 6000 GPU rental offering. Highlighted edge deployment, no egress fees, and solar-powered infrastructure." },
+  { label: "Sent LinkedIn note", type: "Note", text: "Sent LinkedIn Sales Navigator connection request with personalized note about GPU cost savings." },
+  { label: "Demo scheduled", type: "Meeting", text: "Demo scheduled for [DATE] at [TIME]. Will cover H200 performance benchmarks, pricing vs AWS/Azure, and edge deployment options." },
+  { label: "Demo completed", type: "Meeting", text: "Demo completed. Covered H200/RTX Pro 6000 specs, 30-50% cost advantage, no egress fees, and solar-powered edge locations. Next step: [ACTION]." },
+  { label: "Interested — follow up", type: "Follow-up", text: "Expressed interest in GPU rental pricing. Requested detailed quote for [USE_CASE] workloads. Follow up with pricing deck." },
+  { label: "Not interested", type: "Note", text: "Not interested at this time. Reason: [REASON]. Revisit in [TIMEFRAME]." },
+  { label: "Referred to colleague", type: "Note", text: "Referred to [NAME] at [COMPANY] who handles infrastructure decisions. Will follow up with them directly." },
+  { label: "Pricing discussion", type: "Call", text: "Pricing discussion — reviewed H200 and RTX Pro 6000 rates. Compared against current AWS/Azure spend. Potential savings of [X]% identified. Sending formal quote." },
+  { label: "Contract sent", type: "Email", text: "Sent contract and MSA for GPU rental agreement. Requested review and signature by [DATE]." },
+];
+
 // ─── Follow-Up Scheduler ──────────────────────────────────────────────────────
 function FollowUpButton({ leadId, currentFollowUpAt, currentNote }: {
   leadId: number;
@@ -1194,12 +1207,46 @@ function NoteCard({ note, onUpdated, onDeleted }: { note: any; onUpdated: () => 
 function AddNoteForm({ leadId, onSuccess, onNoteAdded }: { leadId: number; onSuccess: () => void; onNoteAdded?: () => void }) {
   const [content, setContent] = useState("");
   const [noteType, setNoteType] = useState<string>("Note");
+  const [showTemplates, setShowTemplates] = useState(false);
   const createMutation = trpc.notes.create.useMutation({
     onSuccess: () => { setContent(""); onSuccess(); onNoteAdded?.(); },
   });
 
+  const applyTemplate = (tpl: typeof NOTE_TEMPLATES[0]) => {
+    setContent(tpl.text);
+    setNoteType(tpl.type);
+    setShowTemplates(false);
+  };
+
   return (
     <div className="space-y-2">
+      {/* Template picker */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setShowTemplates((v) => !v)}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded border border-border bg-secondary"
+        >
+          <Wand2 className="h-3 w-3" />
+          Quick Templates
+          <ChevronDown className={`h-3 w-3 transition-transform ${showTemplates ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+      {showTemplates && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 p-2 bg-secondary rounded-lg border border-border">
+          {NOTE_TEMPLATES.map((tpl) => (
+            <button
+              key={tpl.label}
+              type="button"
+              onClick={() => applyTemplate(tpl)}
+              className="text-left text-xs px-2 py-1.5 rounded hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2"
+            >
+              <span className="text-muted-foreground text-[10px] uppercase tracking-wide w-12 shrink-0">{tpl.type}</span>
+              <span>{tpl.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex gap-2">
         <Select value={noteType} onValueChange={setNoteType}>
           <SelectTrigger className="w-32 bg-secondary border-border text-xs h-9">
@@ -1209,11 +1256,11 @@ function AddNoteForm({ leadId, onSuccess, onNoteAdded }: { leadId: number; onSuc
             {NOTE_TYPES.map((t) => <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Input
+        <Textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Add a note, call log, or follow-up..."
-          className="flex-1 bg-secondary border-border text-sm h-9"
+          placeholder="Add a note, call log, or follow-up... (Shift+Enter for new line, Enter to save)"
+          className="flex-1 bg-secondary border-border text-sm min-h-[72px] resize-none"
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey && content.trim()) {
               e.preventDefault();
@@ -1227,7 +1274,7 @@ function AddNoteForm({ leadId, onSuccess, onNoteAdded }: { leadId: number; onSuc
             if (content.trim()) createMutation.mutate({ leadId, content, noteType: noteType as any });
           }}
           disabled={!content.trim() || createMutation.isPending}
-          className="h-9"
+          className="h-9 self-end"
         >
           <Plus className="h-4 w-4" />
         </Button>

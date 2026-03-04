@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { Building2, Check, Download, Filter, Loader2, Plus, Search, Sparkles, X } from "lucide-react";
+import { Bell, Building2, Check, ChevronDown, Download, Filter, Loader2, Phone, Plus, Search, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -320,6 +320,7 @@ export default function LeadsList() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Stage</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Data</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Score</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -362,6 +363,9 @@ export default function LeadsList() {
                       <td className="px-4 py-3">
                         <ScoreBadge score={lead.score ?? 0} />
                       </td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <QuickActions lead={lead} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -400,6 +404,10 @@ export default function LeadsList() {
                   <div className="mt-2">
                     <CompletenessBar score={(lead as any).completenessScore ?? 0} />
                   </div>
+                  <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Quick actions</span>
+                    <QuickActions lead={lead} />
+                  </div>
                 </button>
               ))}
             </div>
@@ -407,6 +415,136 @@ export default function LeadsList() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+// ─── Quick Actions ─────────────────────────────────────────────────────────
+
+const STAGE_OPTIONS = ["New", "Contacted", "Qualified", "Closed Won", "Closed Lost"];
+
+function QuickActions({ lead }: { lead: { id: number; companyName: string; pipelineStage?: string | null; followUpAt?: Date | null } }) {
+  const utils = trpc.useUtils();
+  const [stageOpen, setStageOpen] = useState(false);
+  const [followOpen, setFollowOpen] = useState(false);
+  const [followDate, setFollowDate] = useState("");
+  const [logOpen, setLogOpen] = useState(false);
+  const [logContent, setLogContent] = useState("");
+
+  const updateStageMutation = trpc.leads.updateStage.useMutation({
+    onSuccess: () => { utils.leads.list.invalidate(); setStageOpen(false); toast.success("Stage updated"); },
+  });
+  const setFollowUpMutation = trpc.leads.setFollowUp.useMutation({
+    onSuccess: () => { utils.leads.list.invalidate(); setFollowOpen(false); toast.success("Follow-up scheduled"); },
+  });
+  const createNoteMutation = trpc.notes.create.useMutation({
+    onSuccess: () => { utils.leads.list.invalidate(); setLogOpen(false); setLogContent(""); toast.success("Call logged"); },
+  });
+
+  return (
+    <div className="flex items-center gap-1">
+      {/* Log Call */}
+      <div className="relative">
+        <button
+          title="Log Call"
+          onClick={() => setLogOpen((v) => !v)}
+          className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-primary transition-colors"
+        >
+          <Phone className="h-3.5 w-3.5" />
+        </button>
+        {logOpen && (
+          <div className="absolute right-0 top-8 z-50 bg-popover border border-border rounded-lg shadow-xl p-3 w-64 space-y-2">
+            <p className="text-xs font-semibold text-foreground">Log Call — {lead.companyName}</p>
+            <textarea
+              value={logContent}
+              onChange={(e) => setLogContent(e.target.value)}
+              placeholder="Call notes..."
+              className="w-full text-xs bg-secondary border border-border rounded p-2 resize-none h-20 text-foreground"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => { if (logContent.trim()) createNoteMutation.mutate({ leadId: lead.id, content: logContent, noteType: "Call" }); }}
+                disabled={!logContent.trim() || createNoteMutation.isPending}
+                className="flex-1 text-xs bg-primary text-primary-foreground rounded px-2 py-1 hover:bg-primary/90 disabled:opacity-50"
+              >Save</button>
+              <button onClick={() => setLogOpen(false)} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1">Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Move Stage */}
+      <div className="relative">
+        <button
+          title="Move Stage"
+          onClick={() => setStageOpen((v) => !v)}
+          className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-primary transition-colors"
+        >
+          <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+        {stageOpen && (
+          <div className="absolute right-0 top-8 z-50 bg-popover border border-border rounded-lg shadow-xl py-1 w-40">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-3 py-1">Move to Stage</p>
+            {STAGE_OPTIONS.map((stage) => (
+              <button
+                key={stage}
+                onClick={() => updateStageMutation.mutate({ id: lead.id, stage: stage as "New" | "Contacted" | "Qualified" | "Closed Won" | "Closed Lost" })}
+                className={`w-full text-left text-xs px-3 py-1.5 hover:bg-secondary transition-colors ${
+                  lead.pipelineStage === stage ? "text-primary font-semibold" : "text-foreground"
+                }`}
+              >
+                {lead.pipelineStage === stage && <Check className="inline h-3 w-3 mr-1" />}{stage}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Schedule Follow-up */}
+      <div className="relative">
+        <button
+          title="Schedule Follow-up"
+          onClick={() => setFollowOpen((v) => !v)}
+          className={`p-1.5 rounded hover:bg-secondary transition-colors ${
+            lead.followUpAt && new Date(lead.followUpAt) < new Date() ? "text-red-400" : "text-muted-foreground hover:text-primary"
+          }`}
+        >
+          <Bell className="h-3.5 w-3.5" />
+        </button>
+        {followOpen && (
+          <div className="absolute right-0 top-8 z-50 bg-popover border border-border rounded-lg shadow-xl p-3 w-56 space-y-2">
+            <p className="text-xs font-semibold text-foreground">Schedule Follow-up</p>
+            <input
+              type="date"
+              value={followDate}
+              onChange={(e) => setFollowDate(e.target.value)}
+              className="w-full text-xs bg-secondary border border-border rounded p-2 text-foreground"
+              min={new Date().toISOString().split("T")[0]}
+            />
+            <div className="flex gap-1 flex-wrap">
+              {[1, 3, 5, 7].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => {
+                    const dt = new Date(); dt.setDate(dt.getDate() + d);
+                    setFollowDate(dt.toISOString().split("T")[0]);
+                  }}
+                  className="text-[10px] px-1.5 py-0.5 rounded bg-secondary hover:bg-accent text-muted-foreground hover:text-accent-foreground border border-border"
+                >+{d}d</button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { if (followDate) setFollowUpMutation.mutate({ id: lead.id, followUpAt: followDate + "T12:00:00", followUpNote: undefined }); }}
+                disabled={!followDate || setFollowUpMutation.isPending}
+                className="flex-1 text-xs bg-primary text-primary-foreground rounded px-2 py-1 hover:bg-primary/90 disabled:opacity-50"
+              >Set</button>
+              <button onClick={() => setFollowOpen(false)} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1">Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

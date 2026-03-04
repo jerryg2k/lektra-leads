@@ -10,6 +10,7 @@ import LeadsList from "./pages/LeadsList";
 import Pipeline from "@/pages/Pipeline";
 import Discover from "@/pages/Discover";
 import Import from "./pages/Import";
+import Settings from "./pages/Settings";
 
 function Router() {
   return (
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/pipeline" component={Pipeline} />
       <Route path="/discover" component={Discover} />
       <Route path="/import" component={Import} />
+      <Route path="/settings" component={Settings} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
