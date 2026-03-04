@@ -1293,6 +1293,24 @@ Return JSON with exactly: { "subject": "...", "body": "..." }`;
         await db.update(emailSequences).set(rest).where(eq(emailSequences.id, id));
         return { success: true };
       }),
+
+    deleteStep: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.delete(emailSequences).where(eq(emailSequences.id, input.id));
+        return { success: true };
+      }),
+
+    deleteAll: protectedProcedure
+      .input(z.object({ leadId: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.delete(emailSequences).where(eq(emailSequences.leadId, input.leadId));
+        return { success: true };
+      }),
   }),
 
   // ─── Notes ──────────────────────────────────────────────────────────────────

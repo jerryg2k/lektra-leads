@@ -127,3 +127,17 @@
 - [x] Note templates quick-fill dropdown (Left voicemail, Sent intro email, Demo scheduled, etc.)
 - [x] Lead card quick-actions: Log Call, Move Stage, Schedule Follow-up without opening detail page
 - [x] Digest timezone preference settings page
+
+## Note Edit & Delete (new request)
+- [ ] Edit note inline in activity log (pencil icon → textarea → save/cancel)
+- [ ] Delete note with confirmation (trash icon → confirm dialog)
+- [ ] Backend: notes.update procedure (update content by note id)
+- [ ] Backend: notes.delete procedure (delete note by id)
+
+## Email Sequence Edit & Delete (new request)
+- [x] Backend: sequences.updateStep procedure (edit subject + body by sequence id)
+- [x] Backend: sequences.deleteStep procedure (delete a single step by id)
+- [x] Backend: sequences.deleteAll procedure (delete entire sequence for a lead)
+- [x] UI: Edit button on each sequence step card (inline subject + body editor)
+- [x] UI: Delete button on each step with confirmation
+- [x] UI: "Delete entire sequence" button at the top of the sequence panel

@@ -1393,6 +1393,16 @@ function EmailSequenceCard({ leadId, contacts }: { leadId: number; contacts: any
     onSuccess: () => utils.sequences.listByLead.invalidate({ leadId }),
   });
 
+  const deleteStepMutation = trpc.sequences.deleteStep.useMutation({
+    onSuccess: () => { utils.sequences.listByLead.invalidate({ leadId }); toast.success("Step deleted"); },
+    onError: () => toast.error("Failed to delete step"),
+  });
+
+  const deleteAllMutation = trpc.sequences.deleteAll.useMutation({
+    onSuccess: () => { utils.sequences.listByLead.invalidate({ leadId }); toast.success("Sequence deleted"); },
+    onError: () => toast.error("Failed to delete sequence"),
+  });
+
   const selectedContact = contacts.find((c) => String(c.id) === selectedContactId);
 
   const stepLabels: Record<number, string> = {
@@ -1416,6 +1426,19 @@ function EmailSequenceCard({ leadId, contacts }: { leadId: number; contacts: any
             <Mail className="h-4 w-4 text-primary" />
             Email Sequence (3-Step)
           </CardTitle>
+          <div className="flex items-center gap-2">
+            {sequences && sequences.length > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                onClick={() => { if (confirm("Delete the entire sequence for this lead?")) deleteAllMutation.mutate({ leadId }); }}
+                disabled={deleteAllMutation.isPending}
+              >
+                {deleteAllMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                Delete All
+              </Button>
+            )}
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline" className="gap-1.5 border-border text-xs">
@@ -1470,6 +1493,7 @@ function EmailSequenceCard({ leadId, contacts }: { leadId: number; contacts: any
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           AI-drafted 3-step outreach sequence in Jerry's writing style. Review, edit, and mark as sent.
@@ -1495,6 +1519,7 @@ function EmailSequenceCard({ leadId, contacts }: { leadId: number; contacts: any
                 statusColors={statusColors}
                 onStatusChange={(status) => updateStatusMutation.mutate({ id: seq.id, status })}
                 onBodyChange={(subject, body) => updateBodyMutation.mutate({ id: seq.id, subject, body })}
+                onDelete={() => deleteStepMutation.mutate({ id: seq.id })}
               />
             ))}
           </div>
@@ -1510,13 +1535,16 @@ function SequenceStepCard({
   statusColors,
   onStatusChange,
   onBodyChange,
+  onDelete,
 }: {
   seq: any;
   label: string;
   statusColors: Record<string, string>;
   onStatusChange: (status: "Draft" | "Scheduled" | "Sent" | "Skipped") => void;
   onBodyChange: (subject: string, body: string) => void;
+  onDelete: () => void;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [editSubject, setEditSubject] = useState(seq.subject);
   const [editBody, setEditBody] = useState(seq.body);
@@ -1588,6 +1616,21 @@ function SequenceStepCard({
                 {seq.status !== "Skipped" && seq.status !== "Sent" && (
                   <Button size="sm" variant="outline" className="border-border text-xs gap-1 text-muted-foreground" onClick={() => onStatusChange("Skipped")}>
                     Skip
+                  </Button>
+                )}
+                {confirmDelete ? (
+                  <div className="flex items-center gap-1 ml-auto">
+                    <span className="text-xs text-red-400">Delete this step?</span>
+                    <Button size="sm" variant="ghost" className="h-6 text-xs text-red-400 hover:text-red-300 px-2" onClick={() => { onDelete(); setConfirmDelete(false); }}>
+                      Yes
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 text-xs text-muted-foreground px-2" onClick={() => setConfirmDelete(false)}>
+                      No
+                    </Button>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="ghost" className="text-xs gap-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 ml-auto" onClick={() => setConfirmDelete(true)}>
+                    <Trash2 className="h-3 w-3" /> Delete
                   </Button>
                 )}
               </div>
