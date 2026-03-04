@@ -356,7 +356,7 @@ export const appRouter = router({
         z.object({
           leadId: z.number(),
           contactId: z.number().optional(),
-          emailType: z.enum(["cold_intro", "follow_up", "demo_request"]).default("cold_intro"),
+          emailType: z.enum(["cold_intro", "follow_up", "demo_request", "linkedin_connect"]).default("cold_intro"),
         })
       )
       .mutation(async ({ input }) => {
@@ -375,11 +375,92 @@ export const appRouter = router({
         const contactLinkedIn = contact?.linkedinUrl ?? "";
         const contactFitReason = contact?.fitReason ?? "";
 
+        // Handle LinkedIn connect separately
+        if (input.emailType === "linkedin_connect") {
+          const firstName = contact?.firstName ?? contactName.split(" ")[0] ?? "there";
+          const linkedInSystemPrompt = `You are writing a LinkedIn Sales Navigator connection request note on behalf of Jerry Gutierrez, VP of Business Development at Lektra Cloud.
+
+CRITICAL RULES:
+- MAXIMUM 300 characters total (LinkedIn hard limit) — count every character including spaces
+- Must be personal, warm, and specific to the person's role/company — NOT generic
+- Reference their specific GPU use case or AI work at their company
+- Mention Lektra's key differentiator: 30-50% cheaper GPU cloud, no egress fees
+- End with a soft ask to connect — no hard sell
+- NO sign-off needed (LinkedIn shows your name automatically)
+- Sound like Jerry: conversational, first-name basis, genuine enthusiasm
+- Do NOT start with "Hi" or "Hello" — LinkedIn connection notes work better starting with the value hook or their name directly
+
+Examples of Jerry's style at 300 chars:
+"[Name], saw what you're building at [Company] — impressive work on [specific thing]. At Lektra Cloud we're offering H200/RTX Pro 6000 at 30-50% below AWS with zero egress fees. Would love to connect and share more!"
+
+Return JSON with field: note (string, max 300 chars)`;
+
+          const linkedInUserPrompt = `Write a LinkedIn connection note to ${firstName}${contactTitle ? `, ${contactTitle}` : ""} at ${lead.companyName}.
+
+Context:
+- Their company: ${lead.companyName} (${lead.industry ?? "AI"})
+- What they do: ${lead.description ?? lead.aiProducts ?? "AI/ML workloads"}
+- GPU use cases: ${(lead.gpuUseCases ?? []).join(", ") || "AI inference/training"}
+- Funding stage: ${lead.fundingStage ?? ""}
+- Lektra fit: ${lead.lektraFitReason ?? ""}
+${contactFitReason ? `- Why they're a fit: ${contactFitReason}` : ""}
+
+Remember: MUST be under 300 characters total.`;
+
+          const liResponse = await invokeLLM({
+            messages: [
+              { role: "system", content: linkedInSystemPrompt },
+              { role: "user", content: linkedInUserPrompt },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "linkedin_note",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    note: { type: "string", description: "LinkedIn connection note, max 300 characters" },
+                  },
+                  required: ["note"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+
+          const liRaw = liResponse.choices[0]?.message?.content;
+          const liContent = typeof liRaw === "string" ? liRaw : null;
+          if (!liContent) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "LLM returned no content" });
+
+          const liParsed = JSON.parse(liContent) as { note: string };
+          // Hard-enforce 300 char limit
+          const note = liParsed.note.slice(0, 300);
+
+          await createNote({
+            leadId: input.leadId,
+            content: `LinkedIn connection note drafted:\n\n${note}`,
+            noteType: "Note",
+            authorName: "Jerry Gutierrez (AI Draft)",
+          });
+
+          return {
+            subject: "LinkedIn Connection Note",
+            body: note,
+            contactName,
+            contactEmail: contact?.email ?? "",
+            linkedinUrl: contact?.linkedinUrl ?? lead.linkedinUrl ?? "",
+            isLinkedIn: true,
+            charCount: note.length,
+          };
+        }
+
         const emailTypeInstructions = {
           cold_intro: "This is a first-touch cold introduction email. The goal is to open a conversation and get a 15-minute call.",
           follow_up: "This is a follow-up email after no response to a previous outreach. Reference that you reached out before and keep it brief.",
           demo_request: "This is an email requesting a product demo of Lektra Cloud's GPU infrastructure. Emphasize the cost savings and quick deployment.",
-        }[input.emailType];
+          linkedin_connect: "", // handled above
+        }[input.emailType] ?? "";
 
         const systemPrompt = `You are writing a cold outreach email on behalf of Jerry Gutierrez, VP of Business Development at Lektra Cloud.
 
@@ -467,6 +548,9 @@ Also generate a compelling subject line (max 8 words, no clickbait, specific to 
           body: parsed.body,
           contactName,
           contactEmail: contact?.email ?? "",
+          linkedinUrl: contact?.linkedinUrl ?? lead.linkedinUrl ?? "",
+          isLinkedIn: false,
+          charCount: null as number | null,
         };
       }),
 

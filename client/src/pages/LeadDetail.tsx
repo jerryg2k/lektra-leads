@@ -601,19 +601,44 @@ function AddContactForm({ leadId, onSuccess }: { leadId: number; onSuccess: () =
 
 // ─── Email Draft Modal ───────────────────────────────────────────────────────
 
+type DraftResult = {
+  subject: string;
+  body: string;
+  contactEmail: string;
+  linkedinUrl: string;
+  isLinkedIn: boolean;
+  charCount: number | null;
+};
+
+const LI_MAX = 300;
+
 function EmailDraftButton({ leadId, contacts }: { leadId: number; contacts: any[] }) {
   const [open, setOpen] = useState(false);
+  // "email" tab or "linkedin" tab
+  const [activeTab, setActiveTab] = useState<"email" | "linkedin">("email");
   const [emailType, setEmailType] = useState<"cold_intro" | "follow_up" | "demo_request">("cold_intro");
   const [selectedContactId, setSelectedContactId] = useState<string>("primary");
-  const [draft, setDraft] = useState<{ subject: string; body: string; contactEmail: string } | null>(null);
+  const [draft, setDraft] = useState<DraftResult | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Derive char count live as user edits the LinkedIn note
+  const liCharCount = draft?.isLinkedIn ? draft.body.length : 0;
+  const liOver = liCharCount > LI_MAX;
+  const liNearLimit = liCharCount >= 260 && !liOver;
 
   const draftMutation = trpc.leads.draftEmail.useMutation({
     onSuccess: (data) => {
-      setDraft({ subject: data.subject, body: data.body, contactEmail: data.contactEmail });
+      setDraft({
+        subject: data.subject,
+        body: data.body,
+        contactEmail: data.contactEmail,
+        linkedinUrl: data.linkedinUrl,
+        isLinkedIn: data.isLinkedIn,
+        charCount: data.charCount,
+      });
     },
     onError: (err) => {
-      toast.error("Failed to generate email: " + err.message);
+      toast.error("Failed to generate draft: " + err.message);
     },
   });
 
@@ -628,35 +653,41 @@ function EmailDraftButton({ leadId, contacts }: { leadId: number; contacts: any[
 
   const handleGenerate = () => {
     const contactId = selectedContactId !== "primary" ? parseInt(selectedContactId, 10) : undefined;
-    draftMutation.mutate({ leadId, contactId, emailType });
+    const type = activeTab === "linkedin" ? "linkedin_connect" : emailType;
+    draftMutation.mutate({ leadId, contactId, emailType: type });
   };
 
   const handleCopy = () => {
     if (!draft) return;
-    const full = `Subject: ${draft.subject}\n\n${draft.body}`;
-    navigator.clipboard.writeText(full);
+    const text = draft.isLinkedIn ? draft.body : `Subject: ${draft.subject}\n\n${draft.body}`;
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    toast.success("Email copied to clipboard");
+    toast.success(draft.isLinkedIn ? "LinkedIn note copied!" : "Email copied to clipboard");
   };
 
   const handleSendGmail = () => {
     if (!draft) return;
-    sendGmailMutation.mutate({
-      to: draft.contactEmail || "",
-      subject: draft.subject,
-      body: draft.body,
-    });
+    sendGmailMutation.mutate({ to: draft.contactEmail || "", subject: draft.subject, body: draft.body });
   };
 
-  const EMAIL_TYPE_LABELS = {
+  const EMAIL_TYPE_LABELS: Record<string, string> = {
     cold_intro: "Cold Intro",
     follow_up: "Follow-up",
     demo_request: "Demo Request",
   };
 
+  // Build Sales Navigator search URL for the contact
+  const getLinkedInUrl = () => {
+    if (draft?.linkedinUrl) return draft.linkedinUrl;
+    // Fall back to Sales Navigator people search
+    const selectedContact = contacts.find((c) => String(c.id) === selectedContactId);
+    if (selectedContact?.linkedinUrl) return selectedContact.linkedinUrl;
+    return "https://www.linkedin.com/sales/search/people";
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setDraft(null); }}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setDraft(null); setActiveTab("email"); } }}>
       <DialogTrigger asChild>
         <Button
           variant="outline"
@@ -664,33 +695,70 @@ function EmailDraftButton({ leadId, contacts }: { leadId: number; contacts: any[
           className="w-full gap-1.5 border-primary/40 text-primary hover:bg-primary/10 text-xs mt-1"
         >
           <Wand2 className="h-3.5 w-3.5" />
-          Draft Outreach Email
+          Draft Outreach
         </Button>
       </DialogTrigger>
       <DialogContent className="bg-card border-border max-w-2xl w-full">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wand2 className="h-4 w-4 text-primary" />
-            AI Email Draft Generator
+            AI Outreach Draft Generator
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Controls */}
+          {/* Tab switcher */}
+          <div className="flex gap-1 p-1 bg-secondary rounded-xl">
+            <button
+              onClick={() => { setActiveTab("email"); setDraft(null); }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                activeTab === "email"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Mail className="h-3.5 w-3.5" />
+              Email Draft
+            </button>
+            <button
+              onClick={() => { setActiveTab("linkedin"); setDraft(null); }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                activeTab === "linkedin"
+                  ? "bg-[#0077B5]/20 text-[#0ea5e9] shadow-sm border border-[#0077B5]/30"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Linkedin className="h-3.5 w-3.5" />
+              LinkedIn Connect
+              <span className="text-[10px] bg-[#0077B5]/20 text-[#0ea5e9] px-1.5 py-0.5 rounded-full font-semibold">300 chars</span>
+            </button>
+          </div>
+
+          {/* Contact selector — shared */}
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Email Type</Label>
-              <Select value={emailType} onValueChange={(v) => setEmailType(v as any)}>
-                <SelectTrigger className="bg-secondary border-border text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border">
-                  <SelectItem value="cold_intro">Cold Introduction</SelectItem>
-                  <SelectItem value="follow_up">Follow-up</SelectItem>
-                  <SelectItem value="demo_request">Demo Request</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {activeTab === "email" && (
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Email Type</Label>
+                <Select value={emailType} onValueChange={(v) => setEmailType(v as any)}>
+                  <SelectTrigger className="bg-secondary border-border text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border">
+                    <SelectItem value="cold_intro">Cold Introduction</SelectItem>
+                    <SelectItem value="follow_up">Follow-up</SelectItem>
+                    <SelectItem value="demo_request">Demo Request</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {activeTab === "linkedin" && (
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Message Style</Label>
+                <div className="flex items-center h-10 px-3 bg-secondary border border-border rounded-md text-sm text-muted-foreground">
+                  Connection Request Note
+                </div>
+              </div>
+            )}
             <div>
               <Label className="text-xs text-muted-foreground mb-1.5 block">Contact</Label>
               <Select value={selectedContactId} onValueChange={setSelectedContactId}>
@@ -710,13 +778,30 @@ function EmailDraftButton({ leadId, contacts }: { leadId: number; contacts: any[
             </div>
           </div>
 
+          {/* LinkedIn info banner */}
+          {activeTab === "linkedin" && (
+            <div className="flex items-start gap-2 p-3 bg-[#0077B5]/10 border border-[#0077B5]/20 rounded-xl">
+              <Linkedin className="h-4 w-4 text-[#0ea5e9] mt-0.5 shrink-0" />
+              <div className="text-xs text-muted-foreground leading-relaxed">
+                <span className="text-[#0ea5e9] font-semibold">Sales Navigator connection notes are limited to 300 characters.</span>{" "}
+                The AI will write a punchy, personalized message referencing their specific GPU use case and Lektra's cost advantage — tailored to fit exactly within the limit.
+              </div>
+            </div>
+          )}
+
           <Button
             onClick={handleGenerate}
             disabled={draftMutation.isPending}
-            className="w-full gap-2"
+            className={`w-full gap-2 ${
+              activeTab === "linkedin"
+                ? "bg-[#0077B5] hover:bg-[#0077B5]/90 text-white"
+                : ""
+            }`}
           >
             {draftMutation.isPending ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Generating with AI...</>
+            ) : activeTab === "linkedin" ? (
+              <><Linkedin className="h-4 w-4" /> Generate LinkedIn Note</>
             ) : (
               <><Sparkles className="h-4 w-4" /> Generate {EMAIL_TYPE_LABELS[emailType]} Email</>
             )}
@@ -725,22 +810,50 @@ function EmailDraftButton({ leadId, contacts }: { leadId: number; contacts: any[
           {/* Draft Output */}
           {draft && (
             <div className="space-y-3">
-              <div className="p-3 bg-secondary/50 rounded-xl border border-border">
-                <p className="text-xs text-muted-foreground font-medium mb-1">Subject Line</p>
-                <p className="text-sm font-semibold text-foreground">{draft.subject}</p>
-              </div>
+              {/* Email: show subject */}
+              {!draft.isLinkedIn && (
+                <div className="p-3 bg-secondary/50 rounded-xl border border-border">
+                  <p className="text-xs text-muted-foreground font-medium mb-1">Subject Line</p>
+                  <p className="text-sm font-semibold text-foreground">{draft.subject}</p>
+                </div>
+              )}
 
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1.5 block">Email Body (editable)</Label>
-                <Textarea
-                  value={draft.body}
-                  onChange={(e) => setDraft((d) => d ? { ...d, body: e.target.value } : null)}
-                  className="bg-secondary border-border text-sm font-mono leading-relaxed resize-none"
-                  rows={12}
-                />
-              </div>
+              {/* LinkedIn: char counter */}
+              {draft.isLinkedIn && (
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">Connection Note (editable)</Label>
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${
+                    liOver
+                      ? "bg-red-500/20 text-red-400"
+                      : liNearLimit
+                      ? "bg-amber-500/20 text-amber-400"
+                      : "bg-green-500/20 text-green-400"
+                  }`}>
+                    {liCharCount} / {LI_MAX}
+                    {liOver && " ⚠ Over limit!"}
+                  </span>
+                </div>
+              )}
 
-              <div className="flex gap-2">
+              {!draft.isLinkedIn && (
+                <Label className="text-xs text-muted-foreground block">Email Body (editable)</Label>
+              )}
+
+              <Textarea
+                value={draft.body}
+                onChange={(e) => {
+                  const val = draft.isLinkedIn ? e.target.value.slice(0, 300) : e.target.value;
+                  setDraft((d) => d ? { ...d, body: val } : null);
+                }}
+                className={`bg-secondary border-border text-sm font-mono leading-relaxed resize-none ${
+                  liOver ? "border-red-500/50" : ""
+                }`}
+                rows={draft.isLinkedIn ? 5 : 12}
+                maxLength={draft.isLinkedIn ? 300 : undefined}
+              />
+
+              {/* Action buttons */}
+              <div className="flex gap-2 flex-wrap">
                 <Button
                   variant="outline"
                   size="sm"
@@ -748,23 +861,44 @@ function EmailDraftButton({ leadId, contacts }: { leadId: number; contacts: any[
                   onClick={handleCopy}
                 >
                   {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Clipboard className="h-3.5 w-3.5" />}
-                  {copied ? "Copied!" : "Copy to Clipboard"}
+                  {copied ? "Copied!" : "Copy"}
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10 flex-1"
-                  onClick={handleSendGmail}
-                  disabled={sendGmailMutation.isPending || !draft.contactEmail}
-                  title={!draft.contactEmail ? "No email address on file for this contact" : ""}
-                >
-                  {sendGmailMutation.isPending ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Send className="h-3.5 w-3.5" />
-                  )}
-                  Save to Gmail Drafts
-                </Button>
+
+                {draft.isLinkedIn ? (
+                  <a
+                    href={getLinkedInUrl()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1"
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 w-full bg-[#0077B5]/10 border-[#0077B5]/30 text-[#0ea5e9] hover:bg-[#0077B5]/20"
+                    >
+                      <Linkedin className="h-3.5 w-3.5" />
+                      Open in Sales Navigator
+                      <ExternalLink className="h-3 w-3 opacity-60" />
+                    </Button>
+                  </a>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10 flex-1"
+                    onClick={handleSendGmail}
+                    disabled={sendGmailMutation.isPending || !draft.contactEmail}
+                    title={!draft.contactEmail ? "No email address on file for this contact" : ""}
+                  >
+                    {sendGmailMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Send className="h-3.5 w-3.5" />
+                    )}
+                    Save to Gmail Drafts
+                  </Button>
+                )}
+
                 <Button
                   variant="ghost"
                   size="sm"
@@ -773,13 +907,19 @@ function EmailDraftButton({ leadId, contacts }: { leadId: number; contacts: any[
                   disabled={draftMutation.isPending}
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${draftMutation.isPending ? "animate-spin" : ""}`} />
-                  Regenerate
+                  Retry
                 </Button>
               </div>
 
-              {!draft.contactEmail && (
+              {/* Hints */}
+              {!draft.isLinkedIn && !draft.contactEmail && (
                 <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
                   No email address on file for this contact. Add one to enable Gmail send.
+                </p>
+              )}
+              {draft.isLinkedIn && (
+                <p className="text-xs text-muted-foreground bg-secondary/50 border border-border rounded-lg px-3 py-2">
+                  <span className="font-semibold text-[#0ea5e9]">How to use:</span> Copy the note above, click "Open in Sales Navigator", find the contact, click Connect, paste the note into the message field, and send.
                 </p>
               )}
             </div>

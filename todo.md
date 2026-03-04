@@ -71,3 +71,9 @@
 - [x] Editable draft textarea with copy-to-clipboard
 - [x] "Save to Gmail Drafts" button
 - [x] Regenerate button for alternate drafts
+
+## LinkedIn Sales Navigator Draft (new)
+- [x] Add linkedin_connect email type to draftEmail procedure with 300-char enforcement
+- [x] LinkedIn tab in draft modal with live character counter (300 limit)
+- [x] Direct "Open in Sales Navigator" link for the contact
+- [x] Copy to clipboard button for LinkedIn note
