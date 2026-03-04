@@ -599,6 +599,13 @@ export default function LeadDetail() {
             )}
           </CardContent>
         </Card>
+
+        {/* AI Strategy Advisor */}
+        <StrategyAdvisorCard leadId={id} />
+
+        {/* Email Sequences */}
+        <EmailSequenceCard leadId={id} contacts={contacts ?? []} />
+
       </div>
     </DashboardLayout>
   );
@@ -1133,6 +1140,315 @@ function AddNoteForm({ leadId, onSuccess }: { leadId: number; onSuccess: () => v
           <Plus className="h-4 w-4" />
         </Button>
       </div>
+    </div>
+  );
+}
+
+// ─── AI Strategy Advisor ─────────────────────────────────────────────────────
+
+function StrategyAdvisorCard({ leadId }: { leadId: number }) {
+  const [strategy, setStrategy] = useState<string | null>(null);
+  const analyzeMutation = trpc.notes.analyzeStrategy.useMutation({
+    onSuccess: (data) => setStrategy(data.strategy),
+    onError: () => toast.error("Strategy analysis failed. Please try again."),
+  });
+
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            AI Strategy Advisor
+          </CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 border-border text-xs"
+            onClick={() => analyzeMutation.mutate({ leadId })}
+            disabled={analyzeMutation.isPending}
+          >
+            {analyzeMutation.isPending ? (
+              <><Loader2 className="h-3 w-3 animate-spin" /> Analyzing...</>
+            ) : (
+              <><Wand2 className="h-3 w-3" /> {strategy ? "Re-analyze" : "Analyze Strategy"}</>
+            )}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          Reads your activity notes and generates a tailored outreach strategy for this prospect.
+        </p>
+      </CardHeader>
+      {strategy && (
+        <CardContent>
+          <div className="prose prose-sm prose-invert max-w-none text-foreground">
+            {strategy.split("\n").map((line, i) => {
+              if (line.startsWith("## ")) {
+                return (
+                  <h3 key={i} className="text-sm font-semibold text-primary mt-4 mb-1 first:mt-0">
+                    {line.replace("## ", "")}
+                  </h3>
+                );
+              }
+              if (line.startsWith("- ") || line.startsWith("• ")) {
+                return (
+                  <p key={i} className="text-sm text-foreground flex gap-2 mb-1">
+                    <span className="text-primary shrink-0">•</span>
+                    <span>{line.replace(/^[-•]\s/, "")}</span>
+                  </p>
+                );
+              }
+              if (line.trim() === "") return <div key={i} className="h-1" />;
+              return <p key={i} className="text-sm text-foreground mb-1 leading-relaxed">{line}</p>;
+            })}
+          </div>
+          <div className="mt-4 flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 border-border text-xs"
+              onClick={() => {
+                navigator.clipboard.writeText(strategy);
+                toast.success("Strategy copied to clipboard");
+              }}
+            >
+              <Clipboard className="h-3 w-3" /> Copy
+            </Button>
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+// ─── Email Sequence Card ─────────────────────────────────────────────────────
+
+function EmailSequenceCard({ leadId, contacts }: { leadId: number; contacts: any[] }) {
+  const [open, setOpen] = useState(false);
+  const [selectedContactId, setSelectedContactId] = useState<string>("none");
+  const utils = trpc.useUtils();
+
+  const { data: sequences, isLoading } = trpc.sequences.listByLead.useQuery({ leadId });
+
+  const createMutation = trpc.sequences.create.useMutation({
+    onSuccess: () => {
+      utils.sequences.listByLead.invalidate({ leadId });
+      toast.success("3-email sequence generated! Review and send when ready.");
+      setOpen(false);
+    },
+    onError: () => toast.error("Failed to generate sequence. Please try again."),
+  });
+
+  const updateStatusMutation = trpc.sequences.updateStatus.useMutation({
+    onSuccess: () => utils.sequences.listByLead.invalidate({ leadId }),
+  });
+
+  const updateBodyMutation = trpc.sequences.updateBody.useMutation({
+    onSuccess: () => utils.sequences.listByLead.invalidate({ leadId }),
+  });
+
+  const selectedContact = contacts.find((c) => String(c.id) === selectedContactId);
+
+  const stepLabels: Record<number, string> = {
+    1: "Day 1 — Initial Outreach",
+    2: "Day 4 — Follow-up #1",
+    3: "Day 10 — Follow-up #2",
+  };
+
+  const statusColors: Record<string, string> = {
+    Draft: "bg-secondary text-muted-foreground",
+    Scheduled: "bg-blue-500/20 text-blue-400",
+    Sent: "bg-green-500/20 text-green-400",
+    Skipped: "bg-secondary/50 text-muted-foreground line-through",
+  };
+
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <Mail className="h-4 w-4 text-primary" />
+            Email Sequence (3-Step)
+          </CardTitle>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline" className="gap-1.5 border-border text-xs">
+                <Sparkles className="h-3 w-3" />
+                {sequences && sequences.length > 0 ? "Regenerate" : "Start Sequence"}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border">
+              <DialogHeader>
+                <DialogTitle>Generate Email Sequence</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <p className="text-sm text-muted-foreground">
+                  The AI will draft 3 personalized emails (Day 1, Day 4, Day 10) in Jerry's writing style, tailored to this company's GPU use case and Lektra's value proposition.
+                </p>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Target Contact (optional)</Label>
+                  <Select value={selectedContactId} onValueChange={setSelectedContactId}>
+                    <SelectTrigger className="mt-1 bg-secondary border-border">
+                      <SelectValue placeholder="Select a contact..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No specific contact (generic)</SelectItem>
+                      {contacts.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {[c.firstName, c.lastName].filter(Boolean).join(" ")} — {c.title ?? "Contact"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() =>
+                    createMutation.mutate({
+                      leadId,
+                      contactId: selectedContact?.id,
+                      contactName: selectedContact
+                        ? [selectedContact.firstName, selectedContact.lastName].filter(Boolean).join(" ")
+                        : undefined,
+                      contactEmail: selectedContact?.email ?? undefined,
+                    })
+                  }
+                  disabled={createMutation.isPending}
+                >
+                  {createMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Generating 3 emails...</>
+                  ) : (
+                    <><Sparkles className="h-4 w-4 mr-2" /> Generate Sequence</>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          AI-drafted 3-step outreach sequence in Jerry's writing style. Review, edit, and mark as sent.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+          </div>
+        ) : !sequences || sequences.length === 0 ? (
+          <div className="text-center py-6 text-muted-foreground">
+            <Mail className="h-8 w-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No sequence yet. Click "Start Sequence" to generate 3 AI-drafted emails.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {sequences.sort((a, b) => a.stepNumber - b.stepNumber).map((seq) => (
+              <SequenceStepCard
+                key={seq.id}
+                seq={seq}
+                label={stepLabels[seq.stepNumber] ?? `Step ${seq.stepNumber}`}
+                statusColors={statusColors}
+                onStatusChange={(status) => updateStatusMutation.mutate({ id: seq.id, status })}
+                onBodyChange={(subject, body) => updateBodyMutation.mutate({ id: seq.id, subject, body })}
+              />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SequenceStepCard({
+  seq,
+  label,
+  statusColors,
+  onStatusChange,
+  onBodyChange,
+}: {
+  seq: any;
+  label: string;
+  statusColors: Record<string, string>;
+  onStatusChange: (status: "Draft" | "Scheduled" | "Sent" | "Skipped") => void;
+  onBodyChange: (subject: string, body: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [editSubject, setEditSubject] = useState(seq.subject);
+  const [editBody, setEditBody] = useState(seq.body);
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <div className="border border-border rounded-xl overflow-hidden">
+      <div
+        className="flex items-center justify-between p-3 cursor-pointer hover:bg-secondary/30 transition-colors"
+        onClick={() => setExpanded((e) => !e)}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-semibold text-primary shrink-0">{label}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${statusColors[seq.status] ?? ""}`}>
+            {seq.status}
+          </span>
+          <span className="text-xs text-muted-foreground truncate hidden sm:block">{seq.subject}</span>
+        </div>
+        {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
+      </div>
+      {expanded && (
+        <div className="p-3 border-t border-border space-y-3 bg-secondary/20">
+          {editing ? (
+            <>
+              <div>
+                <Label className="text-xs text-muted-foreground">Subject</Label>
+                <Input value={editSubject} onChange={(e) => setEditSubject(e.target.value)} className="mt-1 bg-secondary border-border text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Body</Label>
+                <Textarea value={editBody} onChange={(e) => setEditBody(e.target.value)} className="mt-1 bg-secondary border-border text-sm resize-none" rows={8} />
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => { onBodyChange(editSubject, editBody); setEditing(false); toast.success("Email updated"); }}>
+                  <Check className="h-3 w-3 mr-1" /> Save
+                </Button>
+                <Button size="sm" variant="outline" className="border-border" onClick={() => { setEditSubject(seq.subject); setEditBody(seq.body); setEditing(false); }}>
+                  Cancel
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <p className="text-xs text-muted-foreground font-medium mb-1">Subject</p>
+                <p className="text-sm font-semibold text-foreground">{seq.subject}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground font-medium mb-1">Body</p>
+                <pre className="text-sm text-foreground whitespace-pre-wrap font-sans leading-relaxed">{seq.body}</pre>
+              </div>
+              {seq.scheduledAt && (
+                <p className="text-xs text-muted-foreground">
+                  Scheduled: {new Date(seq.scheduledAt).toLocaleDateString()}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button size="sm" variant="outline" className="border-border text-xs gap-1" onClick={() => setEditing(true)}>
+                  <Wand2 className="h-3 w-3" /> Edit
+                </Button>
+                <Button size="sm" variant="outline" className="border-border text-xs gap-1" onClick={() => { navigator.clipboard.writeText(`Subject: ${seq.subject}\n\n${seq.body}`); toast.success("Copied to clipboard"); }}>
+                  <Clipboard className="h-3 w-3" /> Copy
+                </Button>
+                {seq.status !== "Sent" && (
+                  <Button size="sm" className="text-xs gap-1 bg-green-600 hover:bg-green-700" onClick={() => onStatusChange("Sent")}>
+                    <Check className="h-3 w-3" /> Mark Sent
+                  </Button>
+                )}
+                {seq.status !== "Skipped" && seq.status !== "Sent" && (
+                  <Button size="sm" variant="outline" className="border-border text-xs gap-1 text-muted-foreground" onClick={() => onStatusChange("Skipped")}>
+                    Skip
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -99,3 +99,17 @@
 - [x] Bulk re-enrich: toast showing X/Y leads enriched after completion
 - [x] HubSpot export: completeness filter slider (0-10) with preset buttons (All, ≥5, ≥7, ≥9)
 - [x] HubSpot export: "Preview Count" button shows matching lead count before download
+
+## Email Sequences, Analytics & AI Strategy (new batch)
+- [ ] Feature 1: Follow-up email sequences — "Start Sequence" button on Lead Detail
+- [ ] Feature 1: emailSequences table (leadId, contactId, day, subject, body, status, scheduledAt, sentAt)
+- [ ] Feature 1: sequences.create procedure — generates Day 1/4/10 email drafts via LLM
+- [ ] Feature 1: sequences.list procedure — returns all sequences for a lead
+- [ ] Feature 1: sequences.updateStatus procedure — mark as Sent / Skipped
+- [ ] Feature 1: Sequence UI on Lead Detail — timeline view of Day 1/4/10 emails with copy/edit/mark-sent
+- [ ] Feature 2: Lead source analytics — bar/donut chart on Dashboard (LinkedIn / Apollo / Manual / Discovered)
+- [ ] Feature 2: Average score per source shown alongside count
+- [ ] Feature 3: AI Strategy Advisor — "Get Strategy" button on Lead Detail notes section
+- [ ] Feature 3: Server procedure: analyzeLeadStrategy — reads all notes + lead data, returns structured strategy
+- [ ] Feature 3: Strategy output: engagement summary, recommended next action, talking points, objection handlers
+- [ ] Feature 3: Strategy panel rendered with Streamdown markdown on Lead Detail page

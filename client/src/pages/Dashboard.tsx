@@ -31,6 +31,7 @@ export default function Dashboard() {
   });
   const { data: allLeads } = trpc.leads.list.useQuery({ isArchived: false });
   const { data: overdueLeads, isLoading: overdueLoading } = trpc.leads.overdueFollowUps.useQuery();
+  const { data: sourceStats } = trpc.leads.sourceStats.useQuery();
 
   const totalLeads = allLeads?.length ?? 0;
   const hotCount = allLeads?.filter((l) => (l.score ?? 0) >= 75).length ?? 0;
@@ -246,11 +247,51 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* Lead Source Analytics */}
+        {sourceStats && sourceStats.length > 0 && (
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-primary" />
+                Lead Source Analytics
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {sourceStats.map((s) => {
+                  const maxCount = Math.max(...sourceStats.map((x) => x.count));
+                  const pct = maxCount > 0 ? Math.round((s.count / maxCount) * 100) : 0;
+                  const scoreColor = s.avgScore >= 75 ? "text-green-400" : s.avgScore >= 55 ? "text-amber-400" : "text-red-400";
+                  return (
+                    <div key={s.source}>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-foreground font-medium">{s.source}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-muted-foreground">{s.count} lead{s.count !== 1 ? "s" : ""}</span>
+                          <span className={`font-semibold ${scoreColor}`}>avg {s.avgScore}</span>
+                        </div>
+                      </div>
+                      <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary rounded-full transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground mt-4">
+                Bar width = relative lead count. Avg score shows quality per source.
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </DashboardLayout>
   );
 }
-
 function KpiCard({
   icon: Icon,
   label,

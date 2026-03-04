@@ -119,3 +119,31 @@ export const notes = mysqlTable("notes", {
 
 export type Note = typeof notes.$inferSelect;
 export type InsertNote = typeof notes.$inferInsert;
+
+// ─── Email Sequences ──────────────────────────────────────────────────────────
+
+export const emailSequences = mysqlTable("emailSequences", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  contactId: int("contactId"),
+  contactName: varchar("contactName", { length: 255 }),
+  contactEmail: varchar("contactEmail", { length: 320 }),
+
+  // Which step in the sequence (1 = Day 1, 2 = Day 4, 3 = Day 10)
+  stepNumber: int("stepNumber").notNull(),
+  dayOffset: int("dayOffset").notNull(),
+  // 1, 4, or 10 days from sequence start
+
+  subject: varchar("subject", { length: 512 }).notNull(),
+  body: text("body").notNull(),
+
+  status: mysqlEnum("status", ["Draft", "Scheduled", "Sent", "Skipped"]).default("Draft").notNull(),
+  scheduledAt: timestamp("scheduledAt"),
+  sentAt: timestamp("sentAt"),
+
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type EmailSequence = typeof emailSequences.$inferSelect;
+export type InsertEmailSequence = typeof emailSequences.$inferInsert;

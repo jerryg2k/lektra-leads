@@ -28,6 +28,9 @@ import {
 } from "./scoring";
 import { discoverRouter } from "./routers/discover";
 import { invokeLLM } from "./_core/llm";
+import { getDb } from "./db";
+import { emailSequences } from "../drizzle/schema";
+import { eq, and } from "drizzle-orm";
 
 // ─── Zod Schemas ──────────────────────────────────────────────────────────────
 
@@ -351,6 +354,22 @@ export const appRouter = router({
       }),
 
     pipelineStats: protectedProcedure.query(() => getPipelineStats()),
+
+    sourceStats: protectedProcedure.query(async () => {
+      const allLeads = await getLeads({});
+      const sourceMap: Record<string, { count: number; totalScore: number }> = {};
+      for (const lead of allLeads) {
+        const src = lead.source ?? "Manual";
+        if (!sourceMap[src]) sourceMap[src] = { count: 0, totalScore: 0 };
+        sourceMap[src].count++;
+        sourceMap[src].totalScore += lead.score ?? 0;
+      }
+      return Object.entries(sourceMap).map(([source, data]) => ({
+        source,
+        count: data.count,
+        avgScore: data.count > 0 ? Math.round(data.totalScore / data.count) : 0,
+      })).sort((a, b) => b.count - a.count);
+    }),
 
     draftEmail: protectedProcedure
       .input(
@@ -1089,14 +1108,155 @@ Return JSON: { "description": string, "industry": string, "subIndustry": string,
       }),
   }),
 
-  // ─── Notes ──────────────────────────────────────────────────────────────────
+  // ─── Email Sequences ─────────────────────────────────────────────────────
+  sequences: router({
+    listByLead: protectedProcedure
+      .input(z.object({ leadId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return db.select().from(emailSequences).where(eq(emailSequences.leadId, input.leadId));
+      }),
 
+    create: protectedProcedure
+      .input(z.object({
+        leadId: z.number(),
+        contactId: z.number().optional(),
+        contactName: z.string().optional(),
+        contactEmail: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const lead = await getLeadById(input.leadId);
+        if (!lead) throw new TRPCError({ code: "NOT_FOUND", message: "Lead not found" });
+
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        // Delete any existing sequence for this lead+contact combo
+        await db.delete(emailSequences).where(
+          and(
+            eq(emailSequences.leadId, input.leadId),
+            input.contactId ? eq(emailSequences.contactId, input.contactId) : eq(emailSequences.leadId, input.leadId)
+          )
+        );
+
+        const steps = [
+          { stepNumber: 1, dayOffset: 1, label: "Initial outreach" },
+          { stepNumber: 2, dayOffset: 4, label: "Follow-up #1" },
+          { stepNumber: 3, dayOffset: 10, label: "Follow-up #2 / value add" },
+        ];
+
+        const results = [];
+        for (const step of steps) {
+          const prompt = `You are Jerry Gutierrez, VP of Business Development at Lektra Cloud. Write a ${step.label} email to ${input.contactName ?? "the founder"} at ${lead.companyName}.
+
+Lektra Cloud value proposition:
+- 30-50% cheaper than AWS/Azure/GCP on GPU compute (H200, RTX Pro 6000, B200 coming soon)
+- Solar-powered edge datacenters at commercial/industrial power sources — no land acquisition, no building permits
+- Lower latency, faster deployments, zero egress fees
+- Ideal for AI inference, model training, remote visualization, edge compute
+
+Company context:
+- Company: ${lead.companyName}
+- Industry: ${lead.industry ?? "AI/ML"}
+- GPU use cases: ${Array.isArray(lead.gpuUseCases) ? lead.gpuUseCases.join(", ") : "AI workloads"}
+- Funding stage: ${lead.fundingStage ?? "Unknown"}
+- Why they fit Lektra: ${lead.lektraFitReason ?? "Strong GPU spend signals"}
+- Contact: ${input.contactName ?? "Founder"}
+
+Step: ${step.label} (Day ${step.dayOffset} of a 3-email sequence)
+
+Jerry's writing style rules:
+- Start with "Hi [FirstName]," — always first name only
+- Maximum 3 short paragraphs, each 1-2 sentences
+- Be direct, warm, and conversational — never corporate
+- Reference something specific about their company or GPU use case
+- One clear CTA: ask for a 15-minute call
+- Sign off: "Best, Jerry"
+- For follow-ups: acknowledge it's a follow-up briefly, add new value or angle
+- Never use buzzwords like "synergy", "leverage", "circle back"
+
+Return JSON with exactly: { "subject": "...", "body": "..." }`;
+
+          const response = await invokeLLM({
+            messages: [{ role: "user", content: prompt }],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "email_draft",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    subject: { type: "string" },
+                    body: { type: "string" },
+                  },
+                  required: ["subject", "body"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+
+          const content = response.choices[0]?.message?.content;
+          const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+          const scheduledAt = new Date(Date.now() + step.dayOffset * 86400000);
+
+          await db.insert(emailSequences).values({
+            leadId: input.leadId,
+            contactId: input.contactId ?? null,
+            contactName: input.contactName ?? null,
+            contactEmail: input.contactEmail ?? null,
+            stepNumber: step.stepNumber,
+            dayOffset: step.dayOffset,
+            subject: parsed.subject,
+            body: parsed.body,
+            status: "Draft",
+            scheduledAt,
+          });
+
+          results.push({ step: step.stepNumber, subject: parsed.subject });
+        }
+
+        return { success: true, steps: results };
+      }),
+
+    updateStatus: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        status: z.enum(["Draft", "Scheduled", "Sent", "Skipped"]),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const updateData: Record<string, unknown> = { status: input.status };
+        if (input.status === "Sent") updateData.sentAt = new Date();
+        await db.update(emailSequences).set(updateData).where(eq(emailSequences.id, input.id));
+        return { success: true };
+      }),
+
+    updateBody: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        subject: z.string().optional(),
+        body: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { id, ...rest } = input;
+        await db.update(emailSequences).set(rest).where(eq(emailSequences.id, id));
+        return { success: true };
+      }),
+  }),
+
+  // ─── Notes ──────────────────────────────────────────────────────────────────
   notes: router({
     listByLead: protectedProcedure
       .input(z.object({ leadId: z.number() }))
       .query(({ input }) => getNotesByLeadId(input.leadId)),
 
-    create: protectedProcedure
+     create: protectedProcedure
       .input(
         z.object({
           leadId: z.number(),
@@ -1112,7 +1272,65 @@ Return JSON: { "description": string, "industry": string, "subIndustry": string,
         });
         return { success: true };
       }),
+
+    analyzeStrategy: protectedProcedure
+      .input(z.object({ leadId: z.number() }))
+      .mutation(async ({ input }) => {
+        const lead = await getLeadById(input.leadId);
+        if (!lead) throw new TRPCError({ code: "NOT_FOUND" });
+        const notes = await getNotesByLeadId(input.leadId);
+
+        const notesText = notes.length > 0
+          ? notes.map((n) => `[${n.noteType} - ${new Date(n.createdAt).toLocaleDateString()}] ${n.content}`).join("\n")
+          : "No notes yet.";
+
+        const prompt = `You are a senior B2B sales strategy advisor helping Jerry Gutierrez, VP of Business Development at Lektra Cloud, develop an outreach strategy for a prospect.
+
+Lektra Cloud value proposition:
+- 30-50% cheaper than AWS/Azure/GCP on GPU compute (H200, RTX Pro 6000, B200 coming soon)
+- Solar-powered edge datacenters — no land acquisition, no building permits, placed at power source
+- Lower latency, faster deployments, zero egress fees
+- Ideal for AI inference, model training, remote visualization, edge compute at scale
+
+Prospect company: ${lead.companyName}
+Industry: ${lead.industry ?? "AI/ML"}
+Funding stage: ${lead.fundingStage ?? "Unknown"}
+Headcount: ${lead.headcount ?? "Unknown"}
+GPU use cases: ${Array.isArray(lead.gpuUseCases) ? lead.gpuUseCases.join(", ") : "Unknown"}
+Pipeline stage: ${lead.pipelineStage}
+Lektra fit reason: ${lead.lektraFitReason ?? "Strong GPU spend signals"}
+Recommended GPU: ${lead.recommendedGpu ?? "TBD"}
+
+Activity notes from Jerry:
+${notesText}
+
+Based on the notes and company context, provide a concise, actionable outreach strategy. Structure your response with these sections:
+
+## Engagement Summary
+Brief 2-3 sentence assessment of where this relationship stands and key signals from the notes.
+
+## Recommended Next Action
+One specific, concrete next step Jerry should take this week (be very specific — not generic advice).
+
+## Key Talking Points
+3-4 bullet points tailored to this company's specific GPU use case and pain points vs hyperscalers.
+
+## Objection Handlers
+2-3 likely objections from this prospect and how to address them given Lektra's positioning.
+
+## Risk Flags
+Any red flags or reasons this deal might stall, and how to mitigate them.
+
+Keep the tone direct and practical. Jerry is a seasoned BD professional — skip the basics.`;
+
+        const response = await invokeLLM({
+          messages: [{ role: "user", content: prompt }],
+        });
+
+        const content = response.choices[0]?.message?.content;
+        const strategy = typeof content === "string" ? content : JSON.stringify(content);
+        return { strategy };
+      }),
   }),
 });
-
 export type AppRouter = typeof appRouter;
