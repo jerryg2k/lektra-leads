@@ -147,3 +147,8 @@
 - [x] "Mark Complete" button on each Needs Attention card that clears the follow-up alarm
 - [x] After marking complete, navigate to Lead Detail page anchored to the Notes/Next Steps section
 - [x] Backend: leads.clearFollowUp procedure (sets followUpAt and followUpNote to null)
+
+## Follow-up Alarm UX Improvements (new request)
+- [x] Snooze 3 days button on each Needs Attention card (defers followUpAt by 3 days)
+- [x] Bulk "Clear All" button at top of Needs Attention section
+- [x] Follow-up Edit / Mark Complete / Snooze controls in Lead Detail page header

@@ -89,8 +89,53 @@ function FollowUpButton({ leadId, currentFollowUpAt, currentNote }: {
     const today = new Date();
     return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
   })();
+  const isUrgent = isOverdue || isDueToday;
+
+  const handleSnooze = () => {
+    const snoozeDate = new Date();
+    snoozeDate.setDate(snoozeDate.getDate() + 3);
+    setFollowUpMutation.mutate({
+      id: leadId,
+      followUpAt: snoozeDate.toISOString(),
+      followUpNote: currentNote ?? undefined,
+    });
+  };
+
+  const handleMarkComplete = () => {
+    setFollowUpMutation.mutate({ id: leadId, followUpAt: null, followUpNote: "" });
+  };
 
   return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {/* Snooze 3d — only shown when overdue or due today */}
+      {isUrgent && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 border-amber-500/50 text-amber-400 hover:bg-amber-500/10 text-xs"
+          onClick={handleSnooze}
+          disabled={setFollowUpMutation.isPending}
+          title="Snooze follow-up by 3 days"
+        >
+          <Bell className="h-3 w-3" />
+          Snooze 3d
+        </Button>
+      )}
+
+      {/* Mark Complete — only shown when overdue or due today */}
+      {isUrgent && (
+        <Button
+          size="sm"
+          className="gap-1.5 bg-green-600 hover:bg-green-700 text-xs"
+          onClick={handleMarkComplete}
+          disabled={setFollowUpMutation.isPending}
+          title="Mark follow-up complete and clear alarm"
+        >
+          {setFollowUpMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+          Mark Complete
+        </Button>
+      )}
+
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button
@@ -165,6 +210,7 @@ function FollowUpButton({ leadId, currentFollowUpAt, currentNote }: {
         </div>
       </DialogContent>
     </Dialog>
+    </div>
   );
 }
 

@@ -333,6 +333,7 @@ function KpiCard({
 function NeedsAttentionSection({ leads }: { leads: any[] }) {
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
+  const [clearingAll, setClearingAll] = useState(false);
 
   const setFollowUpMutation = trpc.leads.setFollowUp.useMutation({
     onSuccess: () => {
@@ -350,6 +351,29 @@ function NeedsAttentionSection({ leads }: { leads: any[] }) {
     onError: () => toast.error("Failed to clear follow-up"),
   });
 
+  const snoozeFollowUpMutation = trpc.leads.setFollowUp.useMutation({
+    onSuccess: () => {
+      utils.leads.overdueFollowUps.invalidate();
+      toast.success("Snoozed 3 days");
+    },
+    onError: () => toast.error("Failed to snooze"),
+  });
+
+  const handleClearAll = async () => {
+    if (!confirm(`Clear all ${leads.length} overdue follow-up alarms?`)) return;
+    setClearingAll(true);
+    try {
+      for (const lead of leads) {
+        await clearFollowUpMutation.mutateAsync({ id: lead.id, followUpAt: null, followUpNote: "" });
+      }
+      toast.success(`Cleared ${leads.length} follow-up alarms`);
+    } catch {
+      toast.error("Some alarms could not be cleared");
+    } finally {
+      setClearingAll(false);
+    }
+  };
+
   return (
     <Card className="bg-card border-red-500/30 border">
       <CardHeader className="pb-3 flex flex-row items-center justify-between">
@@ -357,6 +381,18 @@ function NeedsAttentionSection({ leads }: { leads: any[] }) {
           <AlertCircle className="h-4 w-4 text-red-400" />
           Needs Attention — {leads.length} Overdue Follow-up{leads.length !== 1 ? "s" : ""}
         </CardTitle>
+        {leads.length > 1 && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs gap-1 text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
+            onClick={handleClearAll}
+            disabled={clearingAll}
+          >
+            {clearingAll ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+            Clear All
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="p-0">
         <div className="divide-y divide-border">
@@ -368,10 +404,19 @@ function NeedsAttentionSection({ leads }: { leads: any[] }) {
               onMarkComplete={() =>
                 clearFollowUpMutation.mutate({ id: lead.id, followUpAt: null, followUpNote: "" })
               }
+              onSnooze={() => {
+                const snoozeDate = new Date();
+                snoozeDate.setDate(snoozeDate.getDate() + 3);
+                snoozeFollowUpMutation.mutate({
+                  id: lead.id,
+                  followUpAt: snoozeDate.toISOString(),
+                  followUpNote: lead.followUpNote ?? "",
+                });
+              }}
               onSaveEdit={(date, note) =>
                 setFollowUpMutation.mutate({ id: lead.id, followUpAt: date, followUpNote: note })
               }
-              isSaving={setFollowUpMutation.isPending || clearFollowUpMutation.isPending}
+              isSaving={setFollowUpMutation.isPending || clearFollowUpMutation.isPending || snoozeFollowUpMutation.isPending}
             />
           ))}
         </div>
@@ -384,12 +429,14 @@ function NeedsAttentionRow({
   lead,
   onGoToNotes,
   onMarkComplete,
+  onSnooze,
   onSaveEdit,
   isSaving,
 }: {
   lead: any;
   onGoToNotes: () => void;
   onMarkComplete: () => void;
+  onSnooze: () => void;
   onSaveEdit: (date: string, note: string) => void;
   isSaving: boolean;
 }) {
@@ -438,6 +485,18 @@ function NeedsAttentionRow({
           >
             <MessageSquare className="h-3 w-3" />
             Notes & Next Steps
+          </Button>
+
+          {/* Snooze 3 days */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs gap-1 border-border text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 hover:border-amber-500/30"
+            onClick={onSnooze}
+            disabled={isSaving}
+          >
+            <Bell className="h-3 w-3" />
+            Snooze 3d
           </Button>
 
           {/* Mark Complete — clears alarm */}
