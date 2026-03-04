@@ -164,6 +164,7 @@ export default function LeadDetail() {
   const { data: lead, isLoading } = trpc.leads.get.useQuery({ id });
   const { data: contacts } = trpc.contacts.listByLead.useQuery({ leadId: id });
   const { data: notes } = trpc.notes.listByLead.useQuery({ leadId: id });
+  const [noteRefreshKey, setNoteRefreshKey] = useState(0);
 
   const updateStageMutation = trpc.leads.updateStage.useMutation({
     onSuccess: () => {
@@ -576,24 +577,17 @@ export default function LeadDetail() {
             <AddNoteForm
               leadId={id}
               onSuccess={() => utils.notes.listByLead.invalidate({ leadId: id })}
+              onNoteAdded={() => setNoteRefreshKey(k => k + 1)}
             />
             {notes && notes.length > 0 && (
               <div className="space-y-2 mt-2">
                 {notes.map((note) => (
-                  <div key={note.id} className="p-3 bg-secondary/50 rounded-xl border border-border">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                          {note.noteType}
-                        </span>
-                        <span className="text-xs text-muted-foreground">{note.authorName}</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(note.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <p className="text-sm text-foreground">{note.content}</p>
-                  </div>
+                  <NoteCard
+                    key={note.id}
+                    note={note}
+                    onUpdated={() => utils.notes.listByLead.invalidate({ leadId: id })}
+                    onDeleted={() => utils.notes.listByLead.invalidate({ leadId: id })}
+                  />
                 ))}
               </div>
             )}
@@ -601,7 +595,7 @@ export default function LeadDetail() {
         </Card>
 
         {/* AI Strategy Advisor */}
-        <StrategyAdvisorCard leadId={id} />
+        <StrategyAdvisorCard leadId={id} refreshKey={noteRefreshKey} />
 
         {/* Email Sequences */}
         <EmailSequenceCard leadId={id} contacts={contacts ?? []} />
@@ -1097,13 +1091,111 @@ function EmailDraftButton({ leadId, contacts }: { leadId: number; contacts: any[
   );
 }
 
+// ─── Note Card (edit / delete / word-wrap) ───────────────────────────────────
+
+function NoteCard({ note, onUpdated, onDeleted }: { note: any; onUpdated: () => void; onDeleted: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState(note.content as string);
+  const [editType, setEditType] = useState<string>(note.noteType ?? "Note");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const updateMutation = trpc.notes.update.useMutation({
+    onSuccess: () => { setEditing(false); onUpdated(); toast.success("Note updated"); },
+    onError: () => toast.error("Failed to update note"),
+  });
+  const deleteMutation = trpc.notes.delete.useMutation({
+    onSuccess: () => { setConfirmDelete(false); onDeleted(); toast.success("Note deleted"); },
+    onError: () => toast.error("Failed to delete note"),
+  });
+
+  return (
+    <div className="p-3 bg-secondary/50 rounded-xl border border-border group">
+      {editing ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Select value={editType} onValueChange={setEditType}>
+              <SelectTrigger className="h-7 w-32 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {NOTE_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            className="text-sm min-h-[80px] resize-y"
+            autoFocus
+          />
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className="h-7 text-xs"
+              disabled={updateMutation.isPending}
+              onClick={() => updateMutation.mutate({ id: note.id, content: editContent, noteType: editType as any })}
+            >
+              {updateMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+              Save
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setEditing(false); setEditContent(note.content); setEditType(note.noteType ?? "Note"); }}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                {note.noteType}
+              </span>
+              <span className="text-xs text-muted-foreground">{note.authorName}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">{new Date(note.createdAt).toLocaleDateString()}</span>
+              <button
+                onClick={() => setEditing(true)}
+                className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                title="Edit note"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              {confirmDelete ? (
+                <div className="flex items-center gap-1 ml-1">
+                  <span className="text-xs text-red-400">Delete?</span>
+                  <button onClick={() => deleteMutation.mutate({ id: note.id })} className="text-xs text-red-400 hover:text-red-300 font-semibold px-1">
+                    {deleteMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Yes"}
+                  </button>
+                  <button onClick={() => setConfirmDelete(false)} className="text-xs text-muted-foreground hover:text-foreground px-1">No</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400"
+                  title="Delete note"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="text-sm text-foreground whitespace-pre-wrap break-words">{note.content}</p>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Add Note Form ────────────────────────────────────────────────────────────
 
-function AddNoteForm({ leadId, onSuccess }: { leadId: number; onSuccess: () => void }) {
+function AddNoteForm({ leadId, onSuccess, onNoteAdded }: { leadId: number; onSuccess: () => void; onNoteAdded?: () => void }) {
   const [content, setContent] = useState("");
   const [noteType, setNoteType] = useState<string>("Note");
   const createMutation = trpc.notes.create.useMutation({
-    onSuccess: () => { setContent(""); onSuccess(); },
+    onSuccess: () => { setContent(""); onSuccess(); onNoteAdded?.(); },
   });
 
   return (
@@ -1146,12 +1238,19 @@ function AddNoteForm({ leadId, onSuccess }: { leadId: number; onSuccess: () => v
 
 // ─── AI Strategy Advisor ─────────────────────────────────────────────────────
 
-function StrategyAdvisorCard({ leadId }: { leadId: number }) {
+function StrategyAdvisorCard({ leadId, refreshKey }: { leadId: number; refreshKey?: number }) {
   const [strategy, setStrategy] = useState<string | null>(null);
+  const [lastRefreshKey, setLastRefreshKey] = useState<number | undefined>(undefined);
   const analyzeMutation = trpc.notes.analyzeStrategy.useMutation({
-    onSuccess: (data) => setStrategy(data.strategy),
+    onSuccess: (data) => { setStrategy(data.strategy); toast.success("Strategy updated based on latest notes"); },
     onError: () => toast.error("Strategy analysis failed. Please try again."),
   });
+
+  // Auto-refresh strategy when a new note is saved (if strategy was already generated)
+  if (refreshKey !== undefined && refreshKey !== lastRefreshKey && strategy !== null && !analyzeMutation.isPending) {
+    setLastRefreshKey(refreshKey);
+    analyzeMutation.mutate({ leadId });
+  }
 
   return (
     <Card className="bg-card border-border">

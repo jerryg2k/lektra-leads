@@ -29,7 +29,8 @@ import {
 import { discoverRouter } from "./routers/discover";
 import { invokeLLM } from "./_core/llm";
 import { getDb } from "./db";
-import { emailSequences } from "../drizzle/schema";
+import { emailSequences, notes } from "../drizzle/schema";
+import { sendWeeklyDigest } from "./weeklyDigest";
 import { eq, and } from "drizzle-orm";
 
 // ─── Zod Schemas ──────────────────────────────────────────────────────────────
@@ -369,6 +370,11 @@ export const appRouter = router({
         count: data.count,
         avgScore: data.count > 0 ? Math.round(data.totalScore / data.count) : 0,
       })).sort((a, b) => b.count - a.count);
+    }),
+
+    sendDigest: protectedProcedure.mutation(async () => {
+      const result = await sendWeeklyDigest();
+      return result;
     }),
 
     draftEmail: protectedProcedure
@@ -1225,13 +1231,30 @@ Return JSON with exactly: { "subject": "...", "body": "..." }`;
       .input(z.object({
         id: z.number(),
         status: z.enum(["Draft", "Scheduled", "Sent", "Skipped"]),
+        authorName: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const updateData: Record<string, unknown> = { status: input.status };
         if (input.status === "Sent") updateData.sentAt = new Date();
         await db.update(emailSequences).set(updateData).where(eq(emailSequences.id, input.id));
+        // Auto-log a note when an email sequence step is marked as sent
+        if (input.status === "Sent") {
+          const rows = await db.select().from(emailSequences).where(eq(emailSequences.id, input.id)).limit(1);
+          const seq = rows[0];
+          if (seq) {
+            const dayLabel = seq.dayOffset === 0 ? "Day 1 (immediate)" : `Day ${seq.dayOffset}`;
+            const recipient = seq.contactName ? ` to ${seq.contactName}` : "";
+            const noteContent = `📧 Sequence email sent${recipient} — ${dayLabel}\nSubject: ${seq.subject ?? "(no subject)"}\nSent on: ${new Date().toLocaleDateString()}`;
+            await createNote({
+              leadId: seq.leadId,
+              content: noteContent,
+              noteType: "Email",
+              authorName: input.authorName ?? ctx.user.name ?? "Jerry",
+            });
+          }
+        }
         return { success: true };
       }),
 
@@ -1273,6 +1296,29 @@ Return JSON with exactly: { "subject": "...", "body": "..." }`;
         return { success: true };
       }),
 
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          content: z.string().min(1),
+          noteType: z.enum(["Note", "Call", "Email", "Meeting", "Follow-up"]).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { id, ...rest } = input;
+        await db.update(notes).set(rest).where(eq(notes.id, id));
+        return { success: true };
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.delete(notes).where(eq(notes.id, input.id));
+        return { success: true };
+      }),
     analyzeStrategy: protectedProcedure
       .input(z.object({ leadId: z.number() }))
       .mutation(async ({ input }) => {
@@ -1333,4 +1379,5 @@ Keep the tone direct and practical. Jerry is a seasoned BD professional — skip
       }),
   }),
 });
+
 export type AppRouter = typeof appRouter;

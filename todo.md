@@ -113,3 +113,11 @@
 - [ ] Feature 3: Server procedure: analyzeLeadStrategy — reads all notes + lead data, returns structured strategy
 - [ ] Feature 3: Strategy output: engagement summary, recommended next action, talking points, objection handlers
 - [ ] Feature 3: Strategy panel rendered with Streamdown markdown on Lead Detail page
+
+## Notes UX + Automation Batch (new)
+- [ ] Edit notes inline in activity log (pencil icon, inline textarea, save/cancel)
+- [ ] Delete notes with confirmation dialog
+- [ ] Word wrap for long note text (no truncation, whitespace-pre-wrap)
+- [ ] Auto-log note when sequence email step is marked sent
+- [ ] Auto-run strategy analysis invalidation when a note is saved
+- [ ] Weekly BD digest email every Monday 8am (scheduled, top overdue + new leads summary)

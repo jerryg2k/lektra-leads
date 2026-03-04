@@ -13,12 +13,15 @@ import {
   ChevronRight,
   Cpu,
   Flame,
+  Loader2,
+  Mail,
   Plus,
   TrendingUp,
   Users,
   Zap,
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
 
 const STAGE_ORDER = ["New", "Contacted", "Qualified", "Closed Won", "Closed Lost"];
 
@@ -32,6 +35,17 @@ export default function Dashboard() {
   const { data: allLeads } = trpc.leads.list.useQuery({ isArchived: false });
   const { data: overdueLeads, isLoading: overdueLoading } = trpc.leads.overdueFollowUps.useQuery();
   const { data: sourceStats } = trpc.leads.sourceStats.useQuery();
+
+  const sendDigestMutation = trpc.leads.sendDigest.useMutation({
+    onSuccess: (result) => {
+      if (result.sent) {
+        toast.success("Weekly digest sent! Check your Manus notifications.");
+      } else {
+        toast.error("Digest compiled but notification delivery failed. Try again.");
+      }
+    },
+    onError: () => toast.error("Failed to send digest. Please try again."),
+  });
 
   const totalLeads = allLeads?.length ?? 0;
   const hotCount = allLeads?.filter((l) => (l.score ?? 0) >= 75).length ?? 0;
@@ -56,14 +70,31 @@ export default function Dashboard() {
               Lektra Cloud GPU Lead Intelligence
             </p>
           </div>
-          <Button
-            onClick={() => setLocation("/leads")}
-            className="gap-2"
-            size="sm"
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add Lead</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-border text-xs"
+              onClick={() => sendDigestMutation.mutate()}
+              disabled={sendDigestMutation.isPending}
+              title="Send weekly BD digest now (also auto-sends every Monday 7AM UTC)"
+            >
+              {sendDigestMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Mail className="h-3.5 w-3.5" />
+              )}
+              <span className="hidden sm:inline">{sendDigestMutation.isPending ? "Sending..." : "Send Digest"}</span>
+            </Button>
+            <Button
+              onClick={() => setLocation("/leads")}
+              className="gap-2"
+              size="sm"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Add Lead</span>
+            </Button>
+          </div>
         </div>
 
         {/* KPI Cards */}
