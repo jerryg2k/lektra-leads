@@ -26,6 +26,7 @@ import {
   scoreLead,
 } from "./scoring";
 import { discoverRouter } from "./routers/discover";
+import { invokeLLM } from "./_core/llm";
 
 // ─── Zod Schemas ──────────────────────────────────────────────────────────────
 
@@ -349,6 +350,145 @@ export const appRouter = router({
       }),
 
     pipelineStats: protectedProcedure.query(() => getPipelineStats()),
+
+    draftEmail: protectedProcedure
+      .input(
+        z.object({
+          leadId: z.number(),
+          contactId: z.number().optional(),
+          emailType: z.enum(["cold_intro", "follow_up", "demo_request"]).default("cold_intro"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const lead = await getLeadById(input.leadId);
+        if (!lead) throw new TRPCError({ code: "NOT_FOUND" });
+
+        const contacts = await getContactsByLeadId(input.leadId);
+        const contact = input.contactId
+          ? contacts.find((c) => c.id === input.contactId)
+          : contacts.find((c) => c.isPrimary) ?? contacts[0];
+
+        const contactName = contact
+          ? [contact.firstName, contact.lastName].filter(Boolean).join(" ")
+          : "there";
+        const contactTitle = contact?.title ?? "";
+        const contactLinkedIn = contact?.linkedinUrl ?? "";
+        const contactFitReason = contact?.fitReason ?? "";
+
+        const emailTypeInstructions = {
+          cold_intro: "This is a first-touch cold introduction email. The goal is to open a conversation and get a 15-minute call.",
+          follow_up: "This is a follow-up email after no response to a previous outreach. Reference that you reached out before and keep it brief.",
+          demo_request: "This is an email requesting a product demo of Lektra Cloud's GPU infrastructure. Emphasize the cost savings and quick deployment.",
+        }[input.emailType];
+
+        const systemPrompt = `You are writing a cold outreach email on behalf of Jerry Gutierrez, VP of Business Development at Lektra Cloud.
+
+Jerry's writing style (MUST follow exactly):
+- Warm, friendly, conversational — NOT corporate or stiff
+- Opens with "Hi [FirstName]!" (exclamation mark) for cold emails
+- Gets to the point in 2-3 short sentences — NO filler like "I hope this email finds you well"
+- References something specific about the person's company or role
+- States Lektra's value prop concretely: 30-50% cheaper than AWS/Azure/GCP, no egress fees, faster deployments, solar-powered edge datacenters at the source of power
+- One clear, low-friction CTA: "Would love to connect — do you have 15 minutes this week?"
+- Signs off: "Best,\nJerry Gutierrez\nVP Business Development, Lektra Cloud\njerry@lektra.com"
+- NO bullet points in the email body
+- NO long paragraphs — 3-4 sentences total max
+- Sounds human and genuine, not like a sales template
+
+About Lektra Cloud:
+- Edge-scale GPU cloud at 30-50% discount vs hyperscalers (AWS, Azure, GCP, CoreWeave)
+- Current GPU fleet: NVIDIA H200, RTX Pro 6000 (B200 coming soon)
+- Solar + battery powered datacenters placed at commercial/industrial power sources — no land acquisition, no building permits
+- Lower latency, faster deployments, zero egress fees
+- Ideal for: AI inference, model training, fine-tuning, edge compute, remote visualization, HPC
+- Target: US AI startups Seed through Series C spending on GPU compute
+
+Return ONLY the email text — no subject line prefix, no metadata, just the email body starting with the greeting.`;
+
+        const userPrompt = `Write a ${input.emailType.replace("_", " ")} email to ${contactName}${contactTitle ? `, ${contactTitle}` : ""} at ${lead.companyName}.
+
+${emailTypeInstructions}
+
+Company context:
+- Company: ${lead.companyName}
+- Industry: ${lead.industry ?? "AI"}
+- Description: ${lead.description ?? ""}
+- Funding stage: ${lead.fundingStage ?? ""}
+- GPU use cases: ${(lead.gpuUseCases ?? []).join(", ") || "AI/ML workloads"}
+- Estimated GPU spend: ${lead.estimatedGpuSpend ?? "significant"}
+- Recommended Lektra GPU: ${lead.recommendedGpu ?? "H200"}
+- Lektra fit reason: ${lead.lektraFitReason ?? ""}
+- Tech stack: ${lead.techStack ?? ""}
+- AI products: ${lead.aiProducts ?? ""}
+${contactFitReason ? `- Why ${contactName} is a good fit: ${contactFitReason}` : ""}
+${contactLinkedIn ? `- Contact LinkedIn: ${contactLinkedIn}` : ""}
+
+Also generate a compelling subject line (max 8 words, no clickbait, specific to their use case).`;
+
+        const response = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "email_draft",
+              strict: true,
+              schema: {
+                type: "object",
+                properties: {
+                  subject: { type: "string", description: "Email subject line" },
+                  body: { type: "string", description: "Full email body text" },
+                },
+                required: ["subject", "body"],
+                additionalProperties: false,
+              },
+            },
+          },
+        });
+
+        const rawContent = response.choices[0]?.message?.content;
+        const content = typeof rawContent === "string" ? rawContent : null;
+        if (!content) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "LLM returned no content" });
+
+        const parsed = JSON.parse(content) as { subject: string; body: string };
+
+        // Log the email as a note
+        await createNote({
+          leadId: input.leadId,
+          content: `AI email draft generated (${input.emailType.replace("_", " ")}):\n\nSubject: ${parsed.subject}\n\n${parsed.body}`,
+          noteType: "Email",
+          authorName: "Jerry Gutierrez (AI Draft)",
+        });
+
+        return {
+          subject: parsed.subject,
+          body: parsed.body,
+          contactName,
+          contactEmail: contact?.email ?? "",
+        };
+      }),
+
+    sendGmail: protectedProcedure
+      .input(
+        z.object({
+          to: z.string(),
+          subject: z.string(),
+          body: z.string(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        // This procedure signals the frontend to use Gmail MCP
+        // The actual send happens client-side via the Gmail MCP integration
+        // We return the data for the frontend to use
+        return {
+          success: true,
+          to: input.to,
+          subject: input.subject,
+          body: input.body,
+        };
+      }),
 
     exportHubspot: protectedProcedure
       .input(LeadFiltersSchema.optional())

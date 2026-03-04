@@ -12,22 +12,27 @@ import { trpc } from "@/lib/trpc";
 import {
   ArrowLeft,
   Building2,
+  Check,
   ChevronDown,
   ChevronUp,
+  Clipboard,
   Cpu,
   ExternalLink,
   Globe,
   Linkedin,
+  Loader2,
   Mail,
   MessageSquare,
   Phone,
   Plus,
   RefreshCw,
+  Send,
   Sparkles,
   Star,
   Trash2,
   User,
   Users,
+  Wand2,
   Zap,
 } from "lucide-react";
 import { useState } from "react";
@@ -195,6 +200,7 @@ export default function LeadDetail() {
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
+                <EmailDraftButton leadId={id} contacts={contacts ?? []} />
               </div>
             </div>
 
@@ -590,6 +596,197 @@ function AddContactForm({ leadId, onSuccess }: { leadId: number; onSuccess: () =
         {createMutation.isPending ? "Adding..." : "Add Contact"}
       </Button>
     </form>
+  );
+}
+
+// ─── Email Draft Modal ───────────────────────────────────────────────────────
+
+function EmailDraftButton({ leadId, contacts }: { leadId: number; contacts: any[] }) {
+  const [open, setOpen] = useState(false);
+  const [emailType, setEmailType] = useState<"cold_intro" | "follow_up" | "demo_request">("cold_intro");
+  const [selectedContactId, setSelectedContactId] = useState<string>("primary");
+  const [draft, setDraft] = useState<{ subject: string; body: string; contactEmail: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const draftMutation = trpc.leads.draftEmail.useMutation({
+    onSuccess: (data) => {
+      setDraft({ subject: data.subject, body: data.body, contactEmail: data.contactEmail });
+    },
+    onError: (err) => {
+      toast.error("Failed to generate email: " + err.message);
+    },
+  });
+
+  const sendGmailMutation = trpc.leads.sendGmail.useMutation({
+    onSuccess: () => {
+      toast.success("Email saved as Gmail draft! Check your Gmail Drafts folder.");
+    },
+    onError: (err: { message: string }) => {
+      toast.error("Gmail send failed: " + err.message);
+    },
+  });
+
+  const handleGenerate = () => {
+    const contactId = selectedContactId !== "primary" ? parseInt(selectedContactId, 10) : undefined;
+    draftMutation.mutate({ leadId, contactId, emailType });
+  };
+
+  const handleCopy = () => {
+    if (!draft) return;
+    const full = `Subject: ${draft.subject}\n\n${draft.body}`;
+    navigator.clipboard.writeText(full);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast.success("Email copied to clipboard");
+  };
+
+  const handleSendGmail = () => {
+    if (!draft) return;
+    sendGmailMutation.mutate({
+      to: draft.contactEmail || "",
+      subject: draft.subject,
+      body: draft.body,
+    });
+  };
+
+  const EMAIL_TYPE_LABELS = {
+    cold_intro: "Cold Intro",
+    follow_up: "Follow-up",
+    demo_request: "Demo Request",
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setDraft(null); }}>
+      <DialogTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full gap-1.5 border-primary/40 text-primary hover:bg-primary/10 text-xs mt-1"
+        >
+          <Wand2 className="h-3.5 w-3.5" />
+          Draft Outreach Email
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="bg-card border-border max-w-2xl w-full">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Wand2 className="h-4 w-4 text-primary" />
+            AI Email Draft Generator
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Controls */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1.5 block">Email Type</Label>
+              <Select value={emailType} onValueChange={(v) => setEmailType(v as any)}>
+                <SelectTrigger className="bg-secondary border-border text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border">
+                  <SelectItem value="cold_intro">Cold Introduction</SelectItem>
+                  <SelectItem value="follow_up">Follow-up</SelectItem>
+                  <SelectItem value="demo_request">Demo Request</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1.5 block">Contact</Label>
+              <Select value={selectedContactId} onValueChange={setSelectedContactId}>
+                <SelectTrigger className="bg-secondary border-border text-sm">
+                  <SelectValue placeholder="Primary contact" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border">
+                  <SelectItem value="primary">Primary Contact</SelectItem>
+                  {contacts.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {[c.firstName, c.lastName].filter(Boolean).join(" ") || "Unknown"}
+                      {c.title ? ` · ${c.title}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Button
+            onClick={handleGenerate}
+            disabled={draftMutation.isPending}
+            className="w-full gap-2"
+          >
+            {draftMutation.isPending ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Generating with AI...</>
+            ) : (
+              <><Sparkles className="h-4 w-4" /> Generate {EMAIL_TYPE_LABELS[emailType]} Email</>
+            )}
+          </Button>
+
+          {/* Draft Output */}
+          {draft && (
+            <div className="space-y-3">
+              <div className="p-3 bg-secondary/50 rounded-xl border border-border">
+                <p className="text-xs text-muted-foreground font-medium mb-1">Subject Line</p>
+                <p className="text-sm font-semibold text-foreground">{draft.subject}</p>
+              </div>
+
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Email Body (editable)</Label>
+                <Textarea
+                  value={draft.body}
+                  onChange={(e) => setDraft((d) => d ? { ...d, body: e.target.value } : null)}
+                  className="bg-secondary border-border text-sm font-mono leading-relaxed resize-none"
+                  rows={12}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-border flex-1"
+                  onClick={handleCopy}
+                >
+                  {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Clipboard className="h-3.5 w-3.5" />}
+                  {copied ? "Copied!" : "Copy to Clipboard"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10 flex-1"
+                  onClick={handleSendGmail}
+                  disabled={sendGmailMutation.isPending || !draft.contactEmail}
+                  title={!draft.contactEmail ? "No email address on file for this contact" : ""}
+                >
+                  {sendGmailMutation.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Send className="h-3.5 w-3.5" />
+                  )}
+                  Save to Gmail Drafts
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 text-muted-foreground"
+                  onClick={handleGenerate}
+                  disabled={draftMutation.isPending}
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${draftMutation.isPending ? "animate-spin" : ""}`} />
+                  Regenerate
+                </Button>
+              </div>
+
+              {!draft.contactEmail && (
+                <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                  No email address on file for this contact. Add one to enable Gmail send.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

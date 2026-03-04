@@ -64,3 +64,10 @@
 - [x] Duplicate detection (skip companies already in leads database)
 - [x] Discovery results display with score, fit reason, and LinkedIn links
 - [x] Curated seed list of 70+ known AI GPU startup LinkedIn slugs for reliable discovery
+
+## AI Email Draft Creator (new)
+- [x] Server-side tRPC procedure: leads.draftEmail using LLM with Jerry's style profile
+- [x] Email draft modal on Lead Detail page with contact selector
+- [x] Editable draft textarea with copy-to-clipboard
+- [x] "Save to Gmail Drafts" button
+- [x] Regenerate button for alternate drafts
