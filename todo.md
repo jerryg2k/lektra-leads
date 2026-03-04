@@ -152,3 +152,8 @@
 - [x] Snooze 3 days button on each Needs Attention card (defers followUpAt by 3 days)
 - [x] Bulk "Clear All" button at top of Needs Attention section
 - [x] Follow-up Edit / Mark Complete / Snooze controls in Lead Detail page header
+
+## Follow-up UX Polish (new request)
+- [x] Custom snooze duration popover: 1d / 3d / 7d / 2w options (Dashboard + Lead Detail)
+- [x] Auto-log note to activity log when follow-up is snoozed or marked complete
+- [x] Red overdue count badge on Dashboard sidebar nav item

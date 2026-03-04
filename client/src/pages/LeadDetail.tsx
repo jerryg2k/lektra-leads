@@ -4,6 +4,7 @@ import { CompletenessBar } from "@/pages/LeadsList";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -90,36 +91,62 @@ function FollowUpButton({ leadId, currentFollowUpAt, currentNote }: {
     return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
   })();
   const isUrgent = isOverdue || isDueToday;
+  const [snoozeOpen, setSnoozeOpen] = useState(false);
 
-  const handleSnooze = () => {
+  const handleSnooze = (days: number) => {
     const snoozeDate = new Date();
-    snoozeDate.setDate(snoozeDate.getDate() + 3);
+    snoozeDate.setDate(snoozeDate.getDate() + days);
     setFollowUpMutation.mutate({
       id: leadId,
       followUpAt: snoozeDate.toISOString(),
       followUpNote: currentNote ?? undefined,
+      action: "snooze",
+      snoozeDays: days,
     });
+    setSnoozeOpen(false);
   };
 
   const handleMarkComplete = () => {
-    setFollowUpMutation.mutate({ id: leadId, followUpAt: null, followUpNote: "" });
+    setFollowUpMutation.mutate({ id: leadId, followUpAt: null, followUpNote: "", action: "complete" });
   };
+
+  const SNOOZE_OPTIONS = [
+    { label: "1 day", days: 1 },
+    { label: "3 days", days: 3 },
+    { label: "1 week", days: 7 },
+    { label: "2 weeks", days: 14 },
+  ];
 
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
-      {/* Snooze 3d — only shown when overdue or due today */}
+      {/* Snooze popover — only shown when overdue or due today */}
       {isUrgent && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5 border-amber-500/50 text-amber-400 hover:bg-amber-500/10 text-xs"
-          onClick={handleSnooze}
-          disabled={setFollowUpMutation.isPending}
-          title="Snooze follow-up by 3 days"
-        >
-          <Bell className="h-3 w-3" />
-          Snooze 3d
-        </Button>
+        <Popover open={snoozeOpen} onOpenChange={setSnoozeOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 border-amber-500/50 text-amber-400 hover:bg-amber-500/10 text-xs"
+              disabled={setFollowUpMutation.isPending}
+              title="Snooze follow-up"
+            >
+              <Bell className="h-3 w-3" />
+              Snooze
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-36 p-1 bg-card border-border" align="start">
+            <p className="text-xs text-muted-foreground px-2 py-1 font-medium">Snooze for…</p>
+            {SNOOZE_OPTIONS.map(({ label, days }) => (
+              <button
+                key={days}
+                onClick={() => handleSnooze(days)}
+                className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-secondary transition-colors text-foreground"
+              >
+                {label}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
       )}
 
       {/* Mark Complete — only shown when overdue or due today */}

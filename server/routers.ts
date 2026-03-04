@@ -919,14 +919,35 @@ Return JSON: { "description": string, "industry": string, "subIndustry": string,
           id: z.number(),
           followUpAt: z.string().nullable(), // ISO date string or null to clear
           followUpNote: z.string().optional(),
+          // optional action descriptor for auto-logging
+          action: z.enum(["snooze", "complete", "set"]).optional(),
+          snoozeDays: z.number().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const date = input.followUpAt ? new Date(input.followUpAt) : null;
         await updateLead(input.id, {
           followUpAt: date ?? undefined,
           followUpNote: input.followUpNote ?? undefined,
         } as any);
+
+        // Auto-log a Follow-up note when snoozed or marked complete
+        if (input.action === "snooze" && input.snoozeDays) {
+          await createNote({
+            leadId: input.id,
+            content: `Follow-up snoozed ${input.snoozeDays} day${input.snoozeDays === 1 ? "" : "s"} — rescheduled to ${date ? date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "unknown"}.`,
+            noteType: "Follow-up",
+            authorName: ctx.user.name ?? "Unknown",
+          });
+        } else if (input.action === "complete") {
+          await createNote({
+            leadId: input.id,
+            content: `Follow-up marked complete by ${ctx.user.name ?? "team"}.`,
+            noteType: "Follow-up",
+            authorName: ctx.user.name ?? "Unknown",
+          });
+        }
+
         return { success: true };
       }),
 

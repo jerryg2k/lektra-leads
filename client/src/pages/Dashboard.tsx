@@ -25,6 +25,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -404,13 +405,15 @@ function NeedsAttentionSection({ leads }: { leads: any[] }) {
               onMarkComplete={() =>
                 clearFollowUpMutation.mutate({ id: lead.id, followUpAt: null, followUpNote: "" })
               }
-              onSnooze={() => {
+              onSnooze={(days: number) => {
                 const snoozeDate = new Date();
-                snoozeDate.setDate(snoozeDate.getDate() + 3);
+                snoozeDate.setDate(snoozeDate.getDate() + days);
                 snoozeFollowUpMutation.mutate({
                   id: lead.id,
                   followUpAt: snoozeDate.toISOString(),
                   followUpNote: lead.followUpNote ?? "",
+                  action: "snooze",
+                  snoozeDays: days,
                 });
               }}
               onSaveEdit={(date, note) =>
@@ -436,7 +439,7 @@ function NeedsAttentionRow({
   lead: any;
   onGoToNotes: () => void;
   onMarkComplete: () => void;
-  onSnooze: () => void;
+  onSnooze: (days: number) => void;
   onSaveEdit: (date: string, note: string) => void;
   isSaving: boolean;
 }) {
@@ -487,17 +490,42 @@ function NeedsAttentionRow({
             Notes & Next Steps
           </Button>
 
-          {/* Snooze 3 days */}
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs gap-1 border-border text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 hover:border-amber-500/30"
-            onClick={onSnooze}
-            disabled={isSaving}
-          >
-            <Bell className="h-3 w-3" />
-            Snooze 3d
-          </Button>
+          {/* Snooze popover */}
+          {(() => {
+            const SNOOZE_OPTIONS = [
+              { label: "1 day", days: 1 },
+              { label: "3 days", days: 3 },
+              { label: "1 week", days: 7 },
+              { label: "2 weeks", days: 14 },
+            ];
+            return (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1 border-border text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 hover:border-amber-500/30"
+                    disabled={isSaving}
+                  >
+                    <Bell className="h-3 w-3" />
+                    Snooze
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-36 p-1 bg-card border-border" align="end">
+                  <p className="text-xs text-muted-foreground px-2 py-1 font-medium">Snooze for…</p>
+                  {SNOOZE_OPTIONS.map(({ label, days }) => (
+                    <button
+                      key={days}
+                      onClick={() => onSnooze(days)}
+                      className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-secondary transition-colors text-foreground"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            );
+          })()}
 
           {/* Mark Complete — clears alarm */}
           <Button
