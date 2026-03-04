@@ -10,16 +10,22 @@ import {
   BarChart3,
   Bell,
   Building2,
+  CalendarDays,
+  Check,
   ChevronRight,
   Cpu,
   Flame,
   Loader2,
   Mail,
+  MessageSquare,
+  Pencil,
   Plus,
   TrendingUp,
   Users,
+  X,
   Zap,
 } from "lucide-react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -171,44 +177,7 @@ export default function Dashboard() {
 
         {/* Overdue Follow-ups */}
         {(overdueLeads && overdueLeads.length > 0) && (
-          <Card className="bg-card border-red-500/30 border">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-semibold text-red-400 uppercase tracking-wider flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-red-400" />
-                Needs Attention — {overdueLeads.length} Overdue Follow-up{overdueLeads.length !== 1 ? "s" : ""}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border">
-                {overdueLeads.map((lead: any) => {
-                  const daysOverdue = Math.floor((Date.now() - new Date(lead.followUpAt).getTime()) / 86400000);
-                  return (
-                    <button
-                      key={lead.id}
-                      onClick={() => setLocation(`/leads/${lead.id}`)}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors text-left"
-                    >
-                      <div className="h-9 w-9 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
-                        <Bell className="h-4 w-4 text-red-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm text-foreground truncate">{lead.companyName}</span>
-                          <span className="text-xs text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded-full shrink-0">
-                            {daysOverdue === 0 ? "Due today" : `${daysOverdue}d overdue`}
-                          </span>
-                        </div>
-                        {lead.followUpNote && (
-                          <p className="text-xs text-muted-foreground truncate mt-0.5">{lead.followUpNote}</p>
-                        )}
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                    </button>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+          <NeedsAttentionSection leads={overdueLeads} />
         )}
 
         {/* Hot Leads */}
@@ -356,5 +325,190 @@ function KpiCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ─── Needs Attention Section ──────────────────────────────────────────────────
+
+function NeedsAttentionSection({ leads }: { leads: any[] }) {
+  const [, setLocation] = useLocation();
+  const utils = trpc.useUtils();
+
+  const setFollowUpMutation = trpc.leads.setFollowUp.useMutation({
+    onSuccess: () => {
+      utils.leads.overdueFollowUps.invalidate();
+      toast.success("Follow-up updated");
+    },
+    onError: () => toast.error("Failed to update follow-up"),
+  });
+
+  const clearFollowUpMutation = trpc.leads.setFollowUp.useMutation({
+    onSuccess: () => {
+      utils.leads.overdueFollowUps.invalidate();
+      toast.success("Follow-up cleared");
+    },
+    onError: () => toast.error("Failed to clear follow-up"),
+  });
+
+  return (
+    <Card className="bg-card border-red-500/30 border">
+      <CardHeader className="pb-3 flex flex-row items-center justify-between">
+        <CardTitle className="text-sm font-semibold text-red-400 uppercase tracking-wider flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-red-400" />
+          Needs Attention — {leads.length} Overdue Follow-up{leads.length !== 1 ? "s" : ""}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="divide-y divide-border">
+          {leads.map((lead: any) => (
+            <NeedsAttentionRow
+              key={lead.id}
+              lead={lead}
+              onGoToNotes={() => setLocation(`/leads/${lead.id}#notes`)}
+              onMarkComplete={() =>
+                clearFollowUpMutation.mutate({ id: lead.id, followUpAt: null, followUpNote: "" })
+              }
+              onSaveEdit={(date, note) =>
+                setFollowUpMutation.mutate({ id: lead.id, followUpAt: date, followUpNote: note })
+              }
+              isSaving={setFollowUpMutation.isPending || clearFollowUpMutation.isPending}
+            />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function NeedsAttentionRow({
+  lead,
+  onGoToNotes,
+  onMarkComplete,
+  onSaveEdit,
+  isSaving,
+}: {
+  lead: any;
+  onGoToNotes: () => void;
+  onMarkComplete: () => void;
+  onSaveEdit: (date: string, note: string) => void;
+  isSaving: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editDate, setEditDate] = useState(() => {
+    const d = new Date(lead.followUpAt);
+    return d.toISOString().slice(0, 10);
+  });
+  const [editNote, setEditNote] = useState(lead.followUpNote ?? "");
+
+  const daysOverdue = Math.floor(
+    (Date.now() - new Date(lead.followUpAt).getTime()) / 86400000
+  );
+
+  return (
+    <div className="px-4 py-3 space-y-2">
+      {/* Top row: company + overdue badge + action buttons */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
+          <Bell className="h-3.5 w-3.5 text-red-400" />
+        </div>
+        <span className="font-medium text-sm text-foreground">{lead.companyName}</span>
+        <span className="text-xs text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded-full">
+          {daysOverdue === 0 ? "Due today" : `${daysOverdue}d overdue`}
+        </span>
+
+        {/* Action buttons pushed to the right */}
+        <div className="ml-auto flex items-center gap-1.5 flex-wrap">
+          {/* Edit toggle */}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+            onClick={() => setEditing((v) => !v)}
+          >
+            <Pencil className="h-3 w-3" />
+            Edit
+          </Button>
+
+          {/* Go to Notes & Next Steps */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs gap-1 border-border"
+            onClick={onGoToNotes}
+          >
+            <MessageSquare className="h-3 w-3" />
+            Notes & Next Steps
+          </Button>
+
+          {/* Mark Complete — clears alarm */}
+          <Button
+            size="sm"
+            className="h-7 text-xs gap-1 bg-green-600 hover:bg-green-700"
+            onClick={onMarkComplete}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Check className="h-3 w-3" />
+            )}
+            Mark Complete
+          </Button>
+        </div>
+      </div>
+
+      {/* Follow-up note (read mode) */}
+      {!editing && lead.followUpNote && (
+        <p className="text-xs text-muted-foreground pl-10">{lead.followUpNote}</p>
+      )}
+
+      {/* Inline edit form */}
+      {editing && (
+        <div className="pl-10 space-y-2">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <input
+              type="date"
+              value={editDate}
+              onChange={(e) => setEditDate(e.target.value)}
+              className="text-sm bg-secondary border border-border rounded-lg px-2 py-1 text-foreground focus:outline-none focus:border-primary"
+            />
+          </div>
+          <textarea
+            value={editNote}
+            onChange={(e) => setEditNote(e.target.value)}
+            placeholder="Follow-up note..."
+            rows={2}
+            className="w-full text-sm bg-secondary border border-border rounded-lg px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
+          />
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className="h-7 text-xs gap-1"
+              disabled={isSaving}
+              onClick={() => {
+                onSaveEdit(new Date(editDate).toISOString(), editNote);
+                setEditing(false);
+              }}
+            >
+              {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+              Save
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs"
+              onClick={() => {
+                setEditDate(new Date(lead.followUpAt).toISOString().slice(0, 10));
+                setEditNote(lead.followUpNote ?? "");
+                setEditing(false);
+              }}
+            >
+              <X className="h-3 w-3" /> Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

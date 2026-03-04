@@ -141,3 +141,9 @@
 - [x] UI: Edit button on each sequence step card (inline subject + body editor)
 - [x] UI: Delete button on each step with confirmation
 - [x] UI: "Delete entire sequence" button at the top of the sequence panel
+
+## Needs Attention Improvements (new request)
+- [x] Inline edit follow-up date and note directly from Dashboard card
+- [x] "Mark Complete" button on each Needs Attention card that clears the follow-up alarm
+- [x] After marking complete, navigate to Lead Detail page anchored to the Notes/Next Steps section
+- [x] Backend: leads.clearFollowUp procedure (sets followUpAt and followUpNote to null)
