@@ -240,6 +240,7 @@ export default function LeadsList() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Funding</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">GPU Fit</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Stage</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Data</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Score</th>
                   </tr>
                 </thead>
@@ -276,6 +277,9 @@ export default function LeadsList() {
                       </td>
                       <td className="px-4 py-3">
                         <StageBadge stage={lead.pipelineStage ?? "New"} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <CompletenessBar score={(lead as any).completenessScore ?? 0} />
                       </td>
                       <td className="px-4 py-3">
                         <ScoreBadge score={lead.score ?? 0} />
@@ -315,6 +319,9 @@ export default function LeadsList() {
                     <StageBadge stage={lead.pipelineStage ?? "New"} />
                     <GpuRecommendBadge gpu={lead.recommendedGpu ?? "TBD"} />
                   </div>
+                  <div className="mt-2">
+                    <CompletenessBar score={(lead as any).completenessScore ?? 0} />
+                  </div>
                 </button>
               ))}
             </div>
@@ -322,6 +329,22 @@ export default function LeadsList() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+// ─── Completeness Bar ───────────────────────────────────────────────────────
+
+export function CompletenessBar({ score }: { score: number }) {
+  const pct = Math.round((score / 10) * 100);
+  const color = score < 4 ? "bg-red-500" : score < 8 ? "bg-amber-500" : "bg-emerald-500";
+  const textColor = score < 4 ? "text-red-400" : score < 8 ? "text-amber-400" : "text-emerald-400";
+  return (
+    <div className="flex items-center gap-2 min-w-[80px]">
+      <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className={`text-xs font-medium tabular-nums ${textColor}`}>{score}/10</span>
+    </div>
   );
 }
 

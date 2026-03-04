@@ -741,6 +741,117 @@ Lektra Cloud context: GPU cloud provider, 30-50% cheaper than AWS/Azure/GCP, H20
         return merged;
       }),
 
+    // ─── Re-enrich an existing lead with fresh LinkedIn + LLM data ─────────────
+    reEnrich: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const lead = await getLeadById(input.id);
+        if (!lead) throw new TRPCError({ code: "NOT_FOUND" });
+
+        // Reuse the enrichLead logic inline
+        const companyName = lead.companyName;
+        const website = lead.website ?? undefined;
+
+        const guessedSlug = companyName
+          .toLowerCase()
+          .replace(/https?:\/\/(www\.)?/, "")
+          .replace(/\.[a-z]{2,}.*$/, "")
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "");
+
+        let linkedinData: {
+          description?: string; headcount?: string; specialities?: string[];
+          website?: string; linkedinUrl?: string; industry?: string; name?: string; location?: string;
+        } | null = null;
+
+        try {
+          const raw = await callDataApi("LinkedIn/get_company_details", { query: { username: guessedSlug } }) as any;
+          if (raw?.success && raw?.data) {
+            const d = raw.data;
+            const staffRange = d.staffCountRange
+              ? `${d.staffCountRange.start ?? "?"}-${d.staffCountRange.end ?? "?"}`
+              : d.staffCount ? String(d.staffCount) : undefined;
+            linkedinData = {
+              description: d.description ?? undefined,
+              headcount: staffRange,
+              specialities: d.specialities ?? [],
+              website: d.website ?? d.websiteUrl ?? undefined,
+              linkedinUrl: d.linkedinUrl ?? `https://www.linkedin.com/company/${guessedSlug}`,
+              industry: Array.isArray(d.industries) ? d.industries[0] : (d.industry ?? undefined),
+              name: d.name ?? undefined,
+              location: d.headquarter
+                ? `${d.headquarter.city ?? ""}, ${d.headquarter.geographicArea ?? ""}, ${d.headquarter.country ?? ""}`.replace(/^,\s*|,\s*$/g, "")
+                : undefined,
+            };
+          }
+        } catch { /* ignore */ }
+
+        const llmPrompt = `You are a business intelligence analyst. Given the following company info, return a structured JSON object.
+Company Name: ${companyName}
+Website: ${website ?? "Unknown"}
+LinkedIn Description: ${linkedinData?.description ?? "Not available"}
+LinkedIn Industry: ${linkedinData?.industry ?? "Not available"}
+LinkedIn Specialities: ${(linkedinData?.specialities ?? []).join(", ") || "Not available"}
+LinkedIn Headcount: ${linkedinData?.headcount ?? "Not available"}
+LinkedIn Location: ${linkedinData?.location ?? "Not available"}
+
+Return JSON: { "description": string, "industry": string, "subIndustry": string, "location": string, "headcount": string, "fundingStage": "Seed|Series A|Series B|Series C|Series D+|Unknown", "techStack": string, "gpuUseCases": string[], "aiProducts": string, "estimatedGpuSpend": "low|medium|high|very_high", "website": string, "linkedinUrl": string, "fitReason": string, "recommendedGpu": "H200|RTX Pro 6000|B200|Multiple|TBD" }`;
+
+        let llmResult: Record<string, any> = {};
+        try {
+          const response = await invokeLLM({
+            messages: [{ role: "user", content: llmPrompt }],
+            response_format: { type: "json_object" },
+          });
+          const rawContent = response.choices[0]?.message?.content;
+          if (typeof rawContent === "string") llmResult = JSON.parse(rawContent);
+        } catch { /* ignore */ }
+
+        // Build patch — only update blank/stale fields
+        const patch: Record<string, any> = {};
+        let updatedCount = 0;
+
+        const maybeSet = (field: string, newVal: any) => {
+          const existing = (lead as any)[field];
+          const isEmpty = !existing || (Array.isArray(existing) && existing.length === 0);
+          if (isEmpty && newVal && (Array.isArray(newVal) ? newVal.length > 0 : true)) {
+            patch[field] = newVal;
+            updatedCount++;
+          }
+        };
+
+        maybeSet("description", linkedinData?.description ?? llmResult.description);
+        maybeSet("industry", linkedinData?.industry ?? llmResult.industry);
+        maybeSet("location", linkedinData?.location ?? llmResult.location);
+        maybeSet("headcount", linkedinData?.headcount ?? llmResult.headcount);
+        maybeSet("website", linkedinData?.website ?? llmResult.website ?? website);
+        maybeSet("linkedinUrl", linkedinData?.linkedinUrl ?? llmResult.linkedinUrl);
+        maybeSet("techStack", llmResult.techStack);
+        maybeSet("aiProducts", llmResult.aiProducts);
+        maybeSet("estimatedGpuSpend", llmResult.estimatedGpuSpend);
+        if (llmResult.fundingStage && llmResult.fundingStage !== "Unknown") {
+          maybeSet("fundingStage", llmResult.fundingStage);
+        }
+        if (llmResult.gpuUseCases && Array.isArray(llmResult.gpuUseCases) && llmResult.gpuUseCases.length > 0) {
+          maybeSet("gpuUseCases", llmResult.gpuUseCases);
+        }
+
+        if (Object.keys(patch).length > 0) {
+          // Re-score with merged data
+          const merged = { ...lead, ...patch };
+          const { score, breakdown } = scoreLead(merged);
+          const fitReason = generateLektraFitReason(merged);
+          const recommendedGpu = getRecommendedGpu(merged.gpuUseCases ?? []);
+          patch.score = score;
+          patch.scoreBreakdown = breakdown;
+          patch.lektraFitReason = fitReason;
+          patch.recommendedGpu = recommendedGpu;
+          await updateLead(input.id, patch);
+        }
+
+        return { updatedCount, fieldsUpdated: Object.keys(patch).filter(f => !["score","scoreBreakdown","lektraFitReason","recommendedGpu"].includes(f)) };
+      }),
+
     importApollo: protectedProcedure
       .input(z.object({ csvText: z.string() }))
       .mutation(async ({ input }) => {
@@ -778,7 +889,47 @@ Lektra Cloud context: GPU cloud provider, 30-50% cheaper than AWS/Azure/GCP, H20
       .input(ContactCreateSchema)
       .mutation(async ({ input }) => {
         await createContact(input);
-        return { success: true };
+
+        // Auto-enrich: search LinkedIn for the contact's profile if linkedinUrl is missing
+        if (!input.linkedinUrl) {
+          const lead = await getLeadById(input.leadId);
+          const fullName = [input.firstName, input.lastName].filter(Boolean).join(" ");
+          if (fullName && lead) {
+            try {
+              const raw = await callDataApi("LinkedIn/search_people", {
+                query: {
+                  keywords: `${fullName} ${lead.companyName}`,
+                  keywordTitle: input.title ?? "CEO Founder CTO President",
+                  start: "0",
+                },
+              }) as any;
+              if (raw?.success) {
+                const items: any[] = raw?.data?.items ?? [];
+                const nameLower = fullName.toLowerCase();
+                const match = items.find((p: any) =>
+                  (p.fullName ?? "").toLowerCase().includes(nameLower.split(" ")[0] ?? "")
+                ) ?? items[0];
+                if (match) {
+                  // Find the contact we just created by leadId + name
+                  const contacts = await getContactsByLeadId(input.leadId);
+                  const created = contacts.find((c) =>
+                    c.firstName === input.firstName && c.lastName === input.lastName
+                  );
+                  if (created) {
+                    const enrichPatch: Record<string, any> = {};
+                    if (match.profileURL) enrichPatch.linkedinUrl = match.profileURL;
+                    if (match.headline && !input.title) enrichPatch.headline = match.headline;
+                    if (Object.keys(enrichPatch).length > 0) {
+                      await updateContact(created.id, enrichPatch);
+                    }
+                  }
+                }
+              }
+            } catch { /* ignore enrichment errors */ }
+          }
+        }
+
+        return { success: true, enriched: !input.linkedinUrl };
       }),
 
     update: protectedProcedure

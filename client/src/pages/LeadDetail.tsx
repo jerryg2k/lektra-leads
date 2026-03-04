@@ -1,5 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { FundingBadge, GpuRecommendBadge, GpuUseCaseTag, ScoreBadge, StageBadge } from "@/components/LeadBadges";
+import { CompletenessBar } from "@/pages/LeadsList";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -66,6 +67,19 @@ export default function LeadDetail() {
       utils.leads.list.invalidate();
       toast.success(`Lead re-scored: ${score}/100`);
     },
+  });
+
+  const reEnrichMutation = trpc.leads.reEnrich.useMutation({
+    onSuccess: ({ updatedCount, fieldsUpdated }) => {
+      utils.leads.get.invalidate({ id });
+      utils.leads.list.invalidate();
+      if (updatedCount > 0) {
+        toast.success(`Re-enriched: ${updatedCount} field${updatedCount !== 1 ? "s" : ""} updated (${fieldsUpdated.join(", ")})`);
+      } else {
+        toast.info("All fields already complete — nothing new to fill in.");
+      }
+    },
+    onError: (err) => toast.error("Re-enrich failed: " + err.message),
   });
 
   const deleteMutation = trpc.leads.delete.useMutation({
@@ -160,6 +174,9 @@ export default function LeadDetail() {
                     </span>
                   )}
                 </div>
+                <div className="mt-2">
+                  <CompletenessBar score={(lead as any).completenessScore ?? 0} />
+                </div>
               </div>
               <div className="flex flex-col gap-2 shrink-0">
                 {/* Pipeline Stage */}
@@ -182,7 +199,20 @@ export default function LeadDetail() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="gap-1.5 border-border text-xs flex-1"
+                    className="gap-1.5 border-border text-xs"
+                    onClick={() => reEnrichMutation.mutate({ id })}
+                    disabled={reEnrichMutation.isPending}
+                    title="Re-fetch company data from LinkedIn & AI"
+                  >
+                    {reEnrichMutation.isPending
+                      ? <Loader2 className="h-3 w-3 animate-spin" />
+                      : <Sparkles className="h-3 w-3" />}
+                    {reEnrichMutation.isPending ? "Enriching..." : "Re-enrich"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 border-border text-xs"
                     onClick={() => rescoreMutation.mutate({ id })}
                     disabled={rescoreMutation.isPending}
                   >
@@ -546,7 +576,20 @@ function AddContactForm({ leadId, onSuccess }: { leadId: number; onSuccess: () =
     fitReason: "",
     isPrimary: false,
   });
-  const createMutation = trpc.contacts.create.useMutation({ onSuccess });
+  const utils = trpc.useUtils();
+  const createMutation = trpc.contacts.create.useMutation({
+    onSuccess: (data) => {
+      onSuccess();
+      // If server will auto-enrich (no linkedinUrl provided), show enrichment toast
+      if (data.enriched) {
+        toast.info("Contact saved — looking up LinkedIn profile...", { duration: 3000 });
+        // Refresh contacts after a short delay to pick up enriched data
+        setTimeout(() => {
+          utils.contacts.listByLead.invalidate({ leadId });
+        }, 4000);
+      }
+    },
+  });
 
   return (
     <form

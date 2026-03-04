@@ -85,3 +85,8 @@
 - [x] Loading skeleton while enrichment runs
 - [x] Editable enriched fields before saving
 - [x] Confidence indicator showing which fields were auto-filled
+
+## Three Scheduled Features
+- [x] Feature 1: Re-enrich button on Lead Detail page (server reEnrich procedure + Sparkles button in header)
+- [x] Feature 2: Auto-enrich contacts on creation via LinkedIn (people search + headline/URL auto-fill + toast)
+- [x] Feature 3: Data completeness score (0-10) on lead cards and detail header (red<4, amber 4-7, green 8-10)

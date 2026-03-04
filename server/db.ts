@@ -56,7 +56,31 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// ─── Leads ────────────────────────────────────────────────────────────────────
+// ─── Leads ─────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Computes a 0–10 data completeness score for a lead.
+ * 1 point each for: companyName, description, industry, location, headcount,
+ * fundingStage, techStack, gpuUseCases (non-empty), linkedinUrl, and at least one contact.
+ */
+export function computeCompletenessScore(
+  lead: Record<string, any>,
+  contactCount: number
+): number {
+  let score = 0;
+  if (lead.companyName) score++;
+  if (lead.description) score++;
+  if (lead.industry) score++;
+  if (lead.location) score++;
+  if (lead.headcount) score++;
+  if (lead.fundingStage && lead.fundingStage !== "Unknown") score++;
+  if (lead.techStack) score++;
+  const gpuArr = Array.isArray(lead.gpuUseCases) ? lead.gpuUseCases : [];
+  if (gpuArr.length > 0) score++;
+  if (lead.linkedinUrl) score++;
+  if (contactCount > 0) score++;
+  return score;
+}
 
 export type LeadFilters = {
   search?: string;
@@ -93,18 +117,39 @@ export async function getLeads(filters: LeadFilters = {}) {
   if (filters.minScore !== undefined) conditions.push(sql`${leads.score} >= ${filters.minScore}`);
   if (filters.maxScore !== undefined) conditions.push(sql`${leads.score} <= ${filters.maxScore}`);
 
-  return db
+  const rows = await db
     .select()
     .from(leads)
     .where(and(...conditions))
     .orderBy(desc(leads.score));
+
+  // Attach contact counts for completeness scoring
+  if (rows.length === 0) return [];
+  const leadIds = rows.map((r) => r.id);
+  const contactCounts = await db
+    .select({ leadId: contacts.leadId, count: sql<number>`count(*)` })
+    .from(contacts)
+    .where(sql`${contacts.leadId} IN (${sql.join(leadIds.map((id) => sql`${id}`), sql`, `)})`)
+    .groupBy(contacts.leadId);
+  const countMap = new Map(contactCounts.map((c) => [c.leadId, Number(c.count)]));
+
+  return rows.map((row) => ({
+    ...row,
+    completenessScore: computeCompletenessScore(row, countMap.get(row.id) ?? 0),
+  }));
 }
 
 export async function getLeadById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(leads).where(eq(leads.id, id)).limit(1);
-  return result[0];
+  if (!result[0]) return undefined;
+  const contactCount = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(contacts)
+    .where(eq(contacts.leadId, id));
+  const count = Number(contactCount[0]?.count ?? 0);
+  return { ...result[0], completenessScore: computeCompletenessScore(result[0], count) };
 }
 
 export async function createLead(data: InsertLead) {
