@@ -77,3 +77,11 @@
 - [x] LinkedIn tab in draft modal with live character counter (300 limit)
 - [x] Direct "Open in Sales Navigator" link for the contact
 - [x] Copy to clipboard button for LinkedIn note
+
+## Add Lead Auto-Enrichment (new)
+- [x] Server-side enrichLead tRPC procedure (LinkedIn API + LLM)
+- [x] Auto-fill company description, industry, headcount, funding, tech stack, GPU use cases
+- [x] Debounced enrichment trigger on company name / website input
+- [x] Loading skeleton while enrichment runs
+- [x] Editable enriched fields before saving
+- [x] Confidence indicator showing which fields were auto-filled

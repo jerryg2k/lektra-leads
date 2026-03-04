@@ -1,5 +1,6 @@
 import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
+import { callDataApi } from "./_core/dataApi";
 import { z } from "zod";
 import {
   bulkInsertContacts,
@@ -580,6 +581,164 @@ Also generate a compelling subject line (max 8 words, no clickbait, specific to 
         const leadsData = await getLeads(input ?? {});
         const csv = toHubSpotCSV(leadsData);
         return { csv, count: leadsData.length };
+      }),
+
+    // ─── Auto-enrich a company by name or website ─────────────────────────────
+    enrichLead: protectedProcedure
+      .input(
+        z.object({
+          companyName: z.string().optional(),
+          website: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { companyName, website } = input;
+        if (!companyName && !website) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Provide a company name or website" });
+        }
+
+        // Derive a LinkedIn slug guess from company name or website
+        const nameForSlug = companyName ?? website ?? "";
+        const guessedSlug = nameForSlug
+          .toLowerCase()
+          .replace(/https?:\/\/(www\.)?/, "")
+          .replace(/\.[a-z]{2,}.*$/, "")
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "");
+
+        // ── Step 1: Try LinkedIn company details ──────────────────────────────
+        let linkedinData: {
+          description?: string;
+          headcount?: string;
+          specialities?: string[];
+          website?: string;
+          linkedinUrl?: string;
+          crunchbaseUrl?: string;
+          followerCount?: number;
+          tagline?: string;
+          industry?: string;
+          name?: string;
+          location?: string;
+        } | null = null;
+
+        try {
+          const raw = await callDataApi("LinkedIn/get_company_details", {
+            query: { username: guessedSlug },
+          }) as any;
+          if (raw?.success && raw?.data) {
+            const d = raw.data;
+            const staffRange = d.staffCountRange
+              ? `${d.staffCountRange.start ?? "?"}-${d.staffCountRange.end ?? "?"}`
+              : d.staffCount ? String(d.staffCount) : undefined;
+            linkedinData = {
+              description: d.description ?? undefined,
+              headcount: staffRange,
+              specialities: d.specialities ?? [],
+              website: d.website ?? d.websiteUrl ?? undefined,
+              linkedinUrl: d.linkedinUrl ?? `https://www.linkedin.com/company/${guessedSlug}`,
+              crunchbaseUrl: d.crunchbaseUrl ?? undefined,
+              followerCount: d.followerCount ?? undefined,
+              tagline: d.tagline ?? undefined,
+              industry: Array.isArray(d.industries) ? d.industries[0] : (d.industry ?? undefined),
+              name: d.name ?? undefined,
+              location: d.headquarter
+                ? `${d.headquarter.city ?? ""}, ${d.headquarter.geographicArea ?? ""}, ${d.headquarter.country ?? ""}`.replace(/^,\s*|,\s*$/g, "")
+                : undefined,
+            };
+          }
+        } catch {
+          // LinkedIn lookup failed — fall through to LLM
+        }
+
+        // ── Step 2: LLM enrichment (always runs to fill gaps + GPU analysis) ──
+        const llmPrompt = `You are a business intelligence analyst. Given the following company info, return a structured JSON object with enriched data.
+
+Company Name: ${companyName ?? "Unknown"}
+Website: ${website ?? "Unknown"}
+LinkedIn Description: ${linkedinData?.description ?? "Not available"}
+LinkedIn Industry: ${linkedinData?.industry ?? "Not available"}
+LinkedIn Specialities: ${(linkedinData?.specialities ?? []).join(", ") || "Not available"}
+LinkedIn Headcount: ${linkedinData?.headcount ?? "Not available"}
+LinkedIn Location: ${linkedinData?.location ?? "Not available"}
+
+Based on all available information, return this exact JSON:
+{
+  "companyName": "<official company name>",
+  "description": "<2-3 sentence company description>",
+  "industry": "<primary industry: Artificial Intelligence | AI Infrastructure | Machine Learning | Edge AI | Generative AI | Computer Vision | Robotics | MLOps | Healthcare AI | Autonomous Vehicles | Other>",
+  "subIndustry": "<more specific sub-industry>",
+  "location": "<City, State, United States>",
+  "headcount": "<headcount range like 11-50 or 51-200>",
+  "fundingStage": "<Seed | Series A | Series B | Series C | Series D+ | Unknown>",
+  "techStack": "<comma-separated tech stack if known, e.g. PyTorch, CUDA, Kubernetes>",
+  "gpuUseCases": ["<one or more of: inference, training, fine_tuning, edge_compute, remote_viz, hpc>"],
+  "aiProducts": "<brief description of their AI products or services>",
+  "estimatedGpuSpend": "<low | medium | high | very_high>",
+  "website": "<website URL>",
+  "linkedinUrl": "<LinkedIn company URL>",
+  "isGoodFitForLektra": <true|false>,
+  "fitReason": "<1-2 sentence reason why this company is or isn't a good fit for Lektra Cloud GPU rentals>",
+  "recommendedGpu": "<H200 | RTX Pro 6000 | B200 | Multiple | TBD>"
+}
+
+Lektra Cloud context: GPU cloud provider, 30-50% cheaper than AWS/Azure/GCP, H200/RTX Pro 6000/B200 GPUs, targets US AI startups Seed-Series C spending on GPU compute for inference, training, fine-tuning, edge compute, or remote visualization.`;
+
+        let llmResult: {
+          companyName?: string;
+          description?: string;
+          industry?: string;
+          subIndustry?: string;
+          location?: string;
+          headcount?: string;
+          fundingStage?: string;
+          techStack?: string;
+          gpuUseCases?: string[];
+          aiProducts?: string;
+          estimatedGpuSpend?: string;
+          website?: string;
+          linkedinUrl?: string;
+          isGoodFitForLektra?: boolean;
+          fitReason?: string;
+          recommendedGpu?: string;
+        } = {};
+
+        try {
+          const response = await invokeLLM({
+            messages: [{ role: "user", content: llmPrompt }],
+            response_format: { type: "json_object" },
+          });
+          const rawContent = response.choices[0]?.message?.content;
+          const content = typeof rawContent === "string" ? rawContent : null;
+          if (content) llmResult = JSON.parse(content);
+        } catch {
+          // LLM failed — return partial data
+        }
+
+        // ── Step 3: Merge LinkedIn + LLM data, LinkedIn takes precedence for factual fields ──
+        const merged = {
+          companyName: linkedinData?.name ?? llmResult.companyName ?? companyName ?? "",
+          description: linkedinData?.description ?? llmResult.description ?? "",
+          industry: linkedinData?.industry ?? llmResult.industry ?? "",
+          subIndustry: llmResult.subIndustry ?? "",
+          location: linkedinData?.location ?? llmResult.location ?? "",
+          headcount: linkedinData?.headcount ?? llmResult.headcount ?? "",
+          fundingStage: llmResult.fundingStage ?? "Unknown",
+          techStack: llmResult.techStack ?? "",
+          gpuUseCases: llmResult.gpuUseCases ?? [],
+          aiProducts: llmResult.aiProducts ?? "",
+          estimatedGpuSpend: llmResult.estimatedGpuSpend ?? "medium",
+          website: linkedinData?.website ?? llmResult.website ?? website ?? "",
+          linkedinUrl: linkedinData?.linkedinUrl ?? llmResult.linkedinUrl ?? `https://www.linkedin.com/company/${guessedSlug}`,
+          crunchbaseUrl: linkedinData?.crunchbaseUrl ?? "",
+          fitReason: llmResult.fitReason ?? "",
+          recommendedGpu: llmResult.recommendedGpu ?? "TBD",
+          isGoodFitForLektra: llmResult.isGoodFitForLektra ?? true,
+          // Metadata about enrichment quality
+          enrichedFromLinkedIn: linkedinData !== null,
+          enrichedFromLLM: Object.keys(llmResult).length > 0,
+        };
+
+        return merged;
       }),
 
     importApollo: protectedProcedure

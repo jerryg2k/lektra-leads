@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { Building2, Download, Filter, Plus, Search, X } from "lucide-react";
-import { useState } from "react";
+import { Building2, Check, Download, Filter, Loader2, Plus, Search, Sparkles, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
@@ -327,6 +327,9 @@ export default function LeadsList() {
 
 // ─── Add Lead Form ────────────────────────────────────────────────────────────
 
+// Fields that can be auto-filled by enrichment
+type EnrichedFields = Set<string>;
+
 function AddLeadForm({ onSuccess }: { onSuccess: () => void }) {
   const [form, setForm] = useState({
     companyName: "",
@@ -344,7 +347,75 @@ function AddLeadForm({ onSuccess }: { onSuccess: () => void }) {
     gpuUseCases: [] as string[],
   });
 
+  const [enrichedFields, setEnrichedFields] = useState<EnrichedFields>(new Set());
+  const [enriching, setEnriching] = useState(false);
+  const [enrichDone, setEnrichDone] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const createMutation = trpc.leads.create.useMutation({ onSuccess });
+  const enrichMutation = trpc.leads.enrichLead.useMutation({
+    onSuccess: (data) => {
+      const filled = new Set<string>();
+      setForm((f) => {
+        const next = { ...f };
+        const fill = <K extends keyof typeof next>(key: K, val: string | undefined) => {
+          if (val && !f[key]) { (next as any)[key] = val; filled.add(key); }
+        };
+        fill("description", data.description);
+        fill("industry", data.industry);
+        fill("location", data.location);
+        fill("headcount", data.headcount);
+        fill("fundingStage", data.fundingStage !== "Unknown" ? data.fundingStage : undefined);
+        fill("techStack", data.techStack);
+        fill("website", data.website);
+        fill("linkedinUrl", data.linkedinUrl);
+        fill("aiProducts", data.aiProducts);
+        // GPU use cases
+        if (data.gpuUseCases && data.gpuUseCases.length > 0 && f.gpuUseCases.length === 0) {
+          next.gpuUseCases = data.gpuUseCases;
+          filled.add("gpuUseCases");
+        }
+        return next;
+      });
+      setEnrichedFields(filled);
+      setEnrichDone(true);
+      setEnriching(false);
+      const count = filled.size;
+      if (count > 0) {
+        toast.success(`Auto-filled ${count} field${count !== 1 ? "s" : ""} from LinkedIn & AI`);
+      } else {
+        toast.info("No additional data found — fill in manually");
+      }
+    },
+    onError: () => {
+      setEnriching(false);
+      toast.error("Enrichment failed — fill in manually");
+    },
+  });
+
+  // Debounced enrichment trigger when company name or website changes
+  const triggerEnrich = (name: string, site: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!name.trim() && !site.trim()) return;
+    debounceRef.current = setTimeout(() => {
+      if (name.trim().length >= 3 || site.trim().length >= 5) {
+        setEnriching(true);
+        setEnrichDone(false);
+        setEnrichedFields(new Set());
+        enrichMutation.mutate({
+          companyName: name.trim() || undefined,
+          website: site.trim() || undefined,
+        });
+      }
+    }, 1200);
+  };
+
+  const handleNameChange = (v: string) => {
+    setForm((f) => { triggerEnrich(v, f.website); return { ...f, companyName: v }; });
+  };
+  const handleWebsiteChange = (v: string) => {
+    setForm((f) => { triggerEnrich(f.companyName, v); return { ...f, website: v }; });
+  };
 
   const toggleUseCase = (uc: string) => {
     setForm((f) => ({
@@ -365,41 +436,78 @@ function AddLeadForm({ onSuccess }: { onSuccess: () => void }) {
     });
   };
 
+  // Small badge shown next to auto-filled labels
+  const AutoBadge = ({ field }: { field: string }) =>
+    enrichedFields.has(field) ? (
+      <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25">
+        <Sparkles className="h-2.5 w-2.5" /> AI
+      </span>
+    ) : null;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+
+      {/* Enrichment status banner */}
+      {enriching && (
+        <div className="flex items-center gap-2 px-3 py-2.5 bg-primary/10 border border-primary/25 rounded-xl text-xs text-primary">
+          <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+          <span>Looking up company data from LinkedIn & AI...</span>
+        </div>
+      )}
+      {enrichDone && enrichedFields.size > 0 && !enriching && (
+        <div className="flex items-center gap-2 px-3 py-2.5 bg-green-500/10 border border-green-500/25 rounded-xl text-xs text-green-400">
+          <Check className="h-3.5 w-3.5 shrink-0" />
+          <span>Auto-filled <strong>{enrichedFields.size} fields</strong> — review and edit anything below before saving.</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="sm:col-span-2">
           <Label className="text-xs text-muted-foreground">Company Name *</Label>
-          <Input
-            value={form.companyName}
-            onChange={(e) => setForm((f) => ({ ...f, companyName: e.target.value }))}
-            placeholder="e.g. Acme AI Labs"
-            className="mt-1 bg-secondary border-border"
-            required
-          />
+          <div className="relative mt-1">
+            <Input
+              value={form.companyName}
+              onChange={(e) => handleNameChange(e.target.value)}
+              placeholder="Type a company name to auto-fill..."
+              className="bg-secondary border-border pr-8"
+              required
+            />
+            {enriching && (
+              <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-primary" />
+            )}
+            {enrichDone && !enriching && (
+              <Sparkles className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary" />
+            )}
+          </div>
         </div>
         <div>
-          <Label className="text-xs text-muted-foreground">Website</Label>
+          <Label className="text-xs text-muted-foreground">Website <AutoBadge field="website" /></Label>
           <Input
             value={form.website}
-            onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
-            placeholder="https://..."
-            className="mt-1 bg-secondary border-border"
+            onChange={(e) => handleWebsiteChange(e.target.value)}
+            placeholder="https://... (triggers auto-fill)"
+            className={`mt-1 bg-secondary border-border ${
+              enrichedFields.has("website") ? "border-primary/40" : ""
+            }`}
           />
         </div>
         <div>
-          <Label className="text-xs text-muted-foreground">LinkedIn URL</Label>
+          <Label className="text-xs text-muted-foreground">LinkedIn URL <AutoBadge field="linkedinUrl" /></Label>
           <Input
             value={form.linkedinUrl}
             onChange={(e) => setForm((f) => ({ ...f, linkedinUrl: e.target.value }))}
             placeholder="https://linkedin.com/company/..."
-            className="mt-1 bg-secondary border-border"
+            className={`mt-1 bg-secondary border-border ${
+              enrichedFields.has("linkedinUrl") ? "border-primary/40" : ""
+            }`}
           />
         </div>
         <div>
-          <Label className="text-xs text-muted-foreground">Industry</Label>
+          <Label className="text-xs text-muted-foreground">Industry <AutoBadge field="industry" /></Label>
           <Select value={form.industry} onValueChange={(v) => setForm((f) => ({ ...f, industry: v }))}>
-            <SelectTrigger className="mt-1 bg-secondary border-border">
+            <SelectTrigger className={`mt-1 bg-secondary border-border ${
+              enrichedFields.has("industry") ? "border-primary/40" : ""
+            }`}>
               <SelectValue placeholder="Select industry" />
             </SelectTrigger>
             <SelectContent className="bg-popover border-border">
@@ -408,9 +516,11 @@ function AddLeadForm({ onSuccess }: { onSuccess: () => void }) {
           </Select>
         </div>
         <div>
-          <Label className="text-xs text-muted-foreground">Funding Stage</Label>
+          <Label className="text-xs text-muted-foreground">Funding Stage <AutoBadge field="fundingStage" /></Label>
           <Select value={form.fundingStage} onValueChange={(v) => setForm((f) => ({ ...f, fundingStage: v }))}>
-            <SelectTrigger className="mt-1 bg-secondary border-border">
+            <SelectTrigger className={`mt-1 bg-secondary border-border ${
+              enrichedFields.has("fundingStage") ? "border-primary/40" : ""
+            }`}>
               <SelectValue placeholder="Select stage" />
             </SelectTrigger>
             <SelectContent className="bg-popover border-border">
@@ -419,18 +529,22 @@ function AddLeadForm({ onSuccess }: { onSuccess: () => void }) {
           </Select>
         </div>
         <div>
-          <Label className="text-xs text-muted-foreground">Location</Label>
+          <Label className="text-xs text-muted-foreground">Location <AutoBadge field="location" /></Label>
           <Input
             value={form.location}
             onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
             placeholder="e.g. San Francisco, CA"
-            className="mt-1 bg-secondary border-border"
+            className={`mt-1 bg-secondary border-border ${
+              enrichedFields.has("location") ? "border-primary/40" : ""
+            }`}
           />
         </div>
         <div>
-          <Label className="text-xs text-muted-foreground">Headcount</Label>
+          <Label className="text-xs text-muted-foreground">Headcount <AutoBadge field="headcount" /></Label>
           <Select value={form.headcount} onValueChange={(v) => setForm((f) => ({ ...f, headcount: v }))}>
-            <SelectTrigger className="mt-1 bg-secondary border-border">
+            <SelectTrigger className={`mt-1 bg-secondary border-border ${
+              enrichedFields.has("headcount") ? "border-primary/40" : ""
+            }`}>
               <SelectValue placeholder="Team size" />
             </SelectTrigger>
             <SelectContent className="bg-popover border-border">
@@ -461,7 +575,7 @@ function AddLeadForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
 
       <div>
-        <Label className="text-xs text-muted-foreground">GPU Use Cases</Label>
+        <Label className="text-xs text-muted-foreground">GPU Use Cases <AutoBadge field="gpuUseCases" /></Label>
         <div className="flex flex-wrap gap-2 mt-2">
           {GPU_USE_CASES.map((uc) => (
             <button
@@ -481,22 +595,26 @@ function AddLeadForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
 
       <div>
-        <Label className="text-xs text-muted-foreground">Tech Stack</Label>
+        <Label className="text-xs text-muted-foreground">Tech Stack <AutoBadge field="techStack" /></Label>
         <Input
           value={form.techStack}
           onChange={(e) => setForm((f) => ({ ...f, techStack: e.target.value }))}
           placeholder="e.g. PyTorch, CUDA, Kubernetes, vLLM"
-          className="mt-1 bg-secondary border-border"
+          className={`mt-1 bg-secondary border-border ${
+            enrichedFields.has("techStack") ? "border-primary/40" : ""
+          }`}
         />
       </div>
 
       <div>
-        <Label className="text-xs text-muted-foreground">AI Products / Description</Label>
+        <Label className="text-xs text-muted-foreground">AI Products / Description <AutoBadge field="description" /></Label>
         <Textarea
           value={form.description}
           onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           placeholder="Describe what this company builds and their AI/GPU workloads..."
-          className="mt-1 bg-secondary border-border resize-none"
+          className={`mt-1 bg-secondary border-border resize-none ${
+            enrichedFields.has("description") ? "border-primary/40" : ""
+          }`}
           rows={3}
         />
       </div>
@@ -504,9 +622,13 @@ function AddLeadForm({ onSuccess }: { onSuccess: () => void }) {
       <Button
         type="submit"
         className="w-full"
-        disabled={createMutation.isPending || !form.companyName.trim()}
+        disabled={createMutation.isPending || enrichMutation.isPending || !form.companyName.trim()}
       >
-        {createMutation.isPending ? "Scoring & Saving..." : "Add Lead & Auto-Score"}
+        {createMutation.isPending ? (
+          <><Loader2 className="h-4 w-4 animate-spin mr-2" />Scoring & Saving...</>
+        ) : (
+          "Add Lead & Auto-Score"
+        )}
       </Button>
     </form>
   );
