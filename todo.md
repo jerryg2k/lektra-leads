@@ -157,3 +157,8 @@
 - [x] Custom snooze duration popover: 1d / 3d / 7d / 2w options (Dashboard + Lead Detail)
 - [x] Auto-log note to activity log when follow-up is snoozed or marked complete
 - [x] Red overdue count badge on Dashboard sidebar nav item
+
+## Follow-up History & Digest (new request)
+- [x] Follow-up history collapsible section on Lead Detail (filters activity log to Follow-up notes only)
+- [x] Overdue badge on mobile bottom nav bar (mirrors sidebar badge)
+- [x] Weekly digest email opens with overdue follow-up count before top prospects list

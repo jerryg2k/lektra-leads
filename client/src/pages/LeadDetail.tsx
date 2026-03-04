@@ -680,6 +680,9 @@ export default function LeadDetail() {
           </CardContent>
         </Card>
 
+        {/* Follow-up History */}
+        <FollowUpHistoryCard notes={notes ?? []} />
+
         {/* AI Strategy Advisor */}
         <StrategyAdvisorCard leadId={id} refreshKey={noteRefreshKey} />
 
@@ -1712,5 +1715,67 @@ function SequenceStepCard({
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Follow-up History Card ───────────────────────────────────────────────────
+
+function FollowUpHistoryCard({ notes }: { notes: any[] }) {
+  const [open, setOpen] = useState(false);
+
+  const followUpNotes = notes.filter((n) => n.noteType === "Follow-up");
+
+  if (followUpNotes.length === 0) return null;
+
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader className="pb-2 cursor-pointer" onClick={() => setOpen((v) => !v)}>
+        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Bell className="h-4 w-4 text-amber-400" />
+            Follow-up History
+            <span className="text-xs font-normal text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">
+              {followUpNotes.length}
+            </span>
+          </div>
+          {open ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </CardTitle>
+      </CardHeader>
+      {open && (
+        <CardContent className="space-y-2 pt-0">
+          {followUpNotes.map((note) => (
+            <div
+              key={note.id}
+              className="flex items-start gap-3 p-3 bg-secondary/40 rounded-xl border border-amber-500/20"
+            >
+              <div className="h-7 w-7 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                <Bell className="h-3.5 w-3.5 text-amber-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-foreground whitespace-pre-wrap break-words">{note.content}</p>
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(note.createdAt).toLocaleString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  {note.authorName && (
+                    <span className="text-xs text-muted-foreground">· {note.authorName}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      )}
+    </Card>
   );
 }

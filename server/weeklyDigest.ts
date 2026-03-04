@@ -57,6 +57,19 @@ export async function sendWeeklyDigest(): Promise<{ sent: boolean; summary: stri
   lines.push(`📊 **Lektra Cloud BD Weekly Digest — ${now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}**`);
   lines.push("");
 
+  // ── Opening summary ──────────────────────────────────────────────────────────
+  const overdueCount = overdueRows.length;
+  const newCount = newLeadsRows.length;
+  if (overdueCount > 0) {
+    lines.push(`> ⚠️ **You have ${overdueCount} overdue follow-up${overdueCount === 1 ? "" : "s"} requiring attention this week.**`);
+  } else {
+    lines.push(`> ✅ **No overdue follow-ups — your pipeline is up to date!**`);
+  }
+  if (newCount > 0) {
+    lines.push(`> 🌟 **${newCount} new lead${newCount === 1 ? "" : "s"} added this week** — see highlights below.`);
+  }
+  lines.push("");
+
   // Overdue follow-ups
   lines.push("## 🔴 Overdue Follow-ups");
   if (overdueRows.length === 0) {
