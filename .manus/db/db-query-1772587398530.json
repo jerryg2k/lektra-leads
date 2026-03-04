@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE leads ADD COLUMN followUpAt TIMESTAMP NULL DEFAULT NULL, ADD COLUMN followUpNote VARCHAR(512) NULL DEFAULT NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3yZWWDdWgJ6wn7A.root --database VqzMxkU43xUnkTv8sssN4T --execute ALTER TABLE leads ADD COLUMN followUpAt TIMESTAMP NULL DEFAULT NULL, ADD COLUMN followUpNote VARCHAR(512) NULL DEFAULT NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 811
+}

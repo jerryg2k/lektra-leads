@@ -55,8 +55,12 @@ export default function LeadsList() {
   const { data: leads, isLoading, refetch } = trpc.leads.list.useQuery(filters);
   const utils = trpc.useUtils();
 
+  const [exportOpen, setExportOpen] = useState(false);
+  const [minCompleteness, setMinCompleteness] = useState(0);
+
   const exportMutation = trpc.leads.exportHubspot.useMutation({
-    onSuccess: ({ csv, count }) => {
+    onSuccess: ({ csv, count, previewOnly }) => {
+      if (previewOnly) return; // just a count preview
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -65,8 +69,19 @@ export default function LeadsList() {
       a.click();
       URL.revokeObjectURL(url);
       toast.success(`Exported ${count} leads to HubSpot CSV`);
+      setExportOpen(false);
     },
     onError: () => toast.error("Export failed"),
+  });
+
+  const previewMutation = trpc.leads.exportHubspot.useMutation();
+
+  const bulkReEnrichMutation = trpc.leads.bulkReEnrich.useMutation({
+    onSuccess: ({ total, enriched }) => {
+      utils.leads.list.invalidate();
+      toast.success(`Bulk re-enrich complete: ${enriched}/${total} leads updated`);
+    },
+    onError: () => toast.error("Bulk re-enrich failed"),
   });
 
   const hasActiveFilters = !!(industry || fundingStage || pipelineStage || minScore !== undefined);
@@ -94,12 +109,75 @@ export default function LeadsList() {
               variant="outline"
               size="sm"
               className="gap-2 border-border"
-              onClick={() => exportMutation.mutate(filters)}
-              disabled={exportMutation.isPending}
+              onClick={() => {
+                if (confirm(`Re-enrich all leads with completeness < 7? This may take a minute.`)) {
+                  bulkReEnrichMutation.mutate({ minCompleteness: 7 });
+                }
+              }}
+              disabled={bulkReEnrichMutation.isPending}
+              title="Re-enrich all leads with data completeness below 7/10"
             >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Export HubSpot</span>
+              {bulkReEnrichMutation.isPending
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <Sparkles className="h-4 w-4" />}
+              <span className="hidden md:inline">{bulkReEnrichMutation.isPending ? "Enriching..." : "Bulk Re-enrich"}</span>
             </Button>
+            <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2 border-border">
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">Export HubSpot</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-sm bg-card border-border">
+                <DialogHeader>
+                  <DialogTitle>Export to HubSpot CSV</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Minimum Data Completeness</Label>
+                    <p className="text-xs text-muted-foreground">Only export leads with a completeness score at or above this threshold (0 = export all).</p>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range" min={0} max={10} step={1}
+                        value={minCompleteness}
+                        onChange={e => setMinCompleteness(Number(e.target.value))}
+                        className="flex-1 accent-primary"
+                      />
+                      <span className="text-sm font-bold w-8 text-center">{minCompleteness}/10</span>
+                    </div>
+                    <div className="flex gap-2">
+                      {[0, 5, 7, 9].map(v => (
+                        <button key={v} onClick={() => setMinCompleteness(v)}
+                          className={`text-xs px-2 py-1 rounded border transition-colors ${
+                            minCompleteness === v ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary"
+                          }`}>
+                          {v === 0 ? "All" : `≥${v}`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {previewMutation.data && !previewMutation.data.previewOnly === false && (
+                    <p className="text-sm text-muted-foreground">
+                      {previewMutation.data.count} leads match this filter
+                    </p>
+                  )}
+                  <div className="flex gap-2 pt-1">
+                    <Button variant="outline" size="sm" className="flex-1"
+                      onClick={() => previewMutation.mutate({ filters, minCompleteness: minCompleteness || undefined, previewOnly: true })}
+                      disabled={previewMutation.isPending}>
+                      {previewMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Preview Count"}
+                    </Button>
+                    <Button size="sm" className="flex-1"
+                      onClick={() => exportMutation.mutate({ filters, minCompleteness: minCompleteness || undefined })}
+                      disabled={exportMutation.isPending}>
+                      {exportMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Download className="h-3 w-3 mr-1" />}
+                      Export CSV
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" className="gap-2">

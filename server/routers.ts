@@ -576,11 +576,24 @@ Also generate a compelling subject line (max 8 words, no clickbait, specific to 
       }),
 
     exportHubspot: protectedProcedure
-      .input(LeadFiltersSchema.optional())
+      .input(
+        z.object({
+          filters: LeadFiltersSchema.optional(),
+          minCompleteness: z.number().min(0).max(10).optional(),
+          previewOnly: z.boolean().optional(),
+        }).optional()
+      )
       .mutation(async ({ input }) => {
-        const leadsData = await getLeads(input ?? {});
+        let leadsData = await getLeads(input?.filters ?? {});
+        // Apply completeness filter if requested
+        if (input?.minCompleteness !== undefined && input.minCompleteness > 0) {
+          leadsData = leadsData.filter((l: any) => (l.completenessScore ?? 0) >= input.minCompleteness!);
+        }
+        if (input?.previewOnly) {
+          return { csv: "", count: leadsData.length, previewOnly: true };
+        }
         const csv = toHubSpotCSV(leadsData);
-        return { csv, count: leadsData.length };
+        return { csv, count: leadsData.length, previewOnly: false };
       }),
 
     // ─── Auto-enrich a company by name or website ─────────────────────────────
@@ -850,6 +863,135 @@ Return JSON: { "description": string, "industry": string, "subIndustry": string,
         }
 
         return { updatedCount, fieldsUpdated: Object.keys(patch).filter(f => !["score","scoreBreakdown","lektraFitReason","recommendedGpu"].includes(f)) };
+      }),
+
+    // ─── Follow-up scheduling ──────────────────────────────────────────────────
+    setFollowUp: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          followUpAt: z.string().nullable(), // ISO date string or null to clear
+          followUpNote: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const date = input.followUpAt ? new Date(input.followUpAt) : null;
+        await updateLead(input.id, {
+          followUpAt: date ?? undefined,
+          followUpNote: input.followUpNote ?? undefined,
+        } as any);
+        return { success: true };
+      }),
+
+    overdueFollowUps: protectedProcedure.query(async () => {
+      const now = new Date();
+      const allLeads = await getLeads({ isArchived: false });
+      return allLeads.filter((l: any) => {
+        if (!l.followUpAt) return false;
+        const due = new Date(l.followUpAt);
+        // Due today or overdue
+        return due <= new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      }).map((l: any) => ({
+        id: l.id,
+        companyName: l.companyName,
+        followUpAt: l.followUpAt,
+        followUpNote: l.followUpNote,
+        pipelineStage: l.pipelineStage,
+        score: l.score,
+        recommendedGpu: l.recommendedGpu,
+      }));
+    }),
+
+    // ─── Bulk re-enrich incomplete leads ─────────────────────────────────────
+    bulkReEnrich: protectedProcedure
+      .input(z.object({ minCompleteness: z.number().default(7) }))
+      .mutation(async ({ input }) => {
+        const allLeads = await getLeads({ isArchived: false });
+        const incomplete = allLeads.filter((l: any) => (l.completenessScore ?? 0) < input.minCompleteness);
+        let enrichedCount = 0;
+        const results: Array<{ id: number; companyName: string; fieldsUpdated: number }> = [];
+
+        for (const lead of incomplete) {
+          try {
+            const guessedSlug = lead.companyName
+              .toLowerCase()
+              .replace(/https?:\/\/(www\.)?/, "")
+              .replace(/\.[a-z]{2,}.*$/, "")
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-+|-+$/g, "");
+
+            let linkedinData: Record<string, any> | null = null;
+            try {
+              const raw = await callDataApi("LinkedIn/get_company_details", { query: { username: guessedSlug } }) as any;
+              if (raw?.success && raw?.data) {
+                const d = raw.data;
+                const staffRange = d.staffCountRange
+                  ? `${d.staffCountRange.start ?? "?"}-${d.staffCountRange.end ?? "?"}`
+                  : d.staffCount ? String(d.staffCount) : undefined;
+                linkedinData = {
+                  description: d.description ?? undefined,
+                  headcount: staffRange,
+                  specialities: d.specialities ?? [],
+                  website: d.website ?? d.websiteUrl ?? undefined,
+                  linkedinUrl: d.linkedinUrl ?? `https://www.linkedin.com/company/${guessedSlug}`,
+                  industry: Array.isArray(d.industries) ? d.industries[0] : (d.industry ?? undefined),
+                  name: d.name ?? undefined,
+                  location: d.headquarter
+                    ? `${d.headquarter.city ?? ""}, ${d.headquarter.geographicArea ?? ""}, ${d.headquarter.country ?? ""}`.replace(/^,\s*|,\s*$/g, "")
+                    : undefined,
+                };
+              }
+            } catch { /* ignore */ }
+
+            const llmPrompt = `Company: ${lead.companyName}, Website: ${lead.website ?? ""}, LinkedIn desc: ${linkedinData?.description ?? ""}, Industry: ${linkedinData?.industry ?? ""}, Specialities: ${(linkedinData?.specialities ?? []).join(", ")}, Headcount: ${linkedinData?.headcount ?? ""}, Location: ${linkedinData?.location ?? ""}\n\nReturn JSON: { "description": string, "industry": string, "location": string, "headcount": string, "fundingStage": "Seed|Series A|Series B|Series C|Series D+|Unknown", "techStack": string, "gpuUseCases": string[], "aiProducts": string, "linkedinUrl": string, "fitReason": string, "recommendedGpu": "H200|RTX Pro 6000|B200|Multiple|TBD" }`;
+
+            let llmResult: Record<string, any> = {};
+            try {
+              const response = await invokeLLM({
+                messages: [{ role: "user", content: llmPrompt }],
+                response_format: { type: "json_object" },
+              });
+              const rawContent = response.choices[0]?.message?.content;
+              if (typeof rawContent === "string") llmResult = JSON.parse(rawContent);
+            } catch { /* ignore */ }
+
+            const patch: Record<string, any> = {};
+            let updatedCount = 0;
+            const maybeSet = (field: string, newVal: any) => {
+              const existing = (lead as any)[field];
+              const isEmpty = !existing || (Array.isArray(existing) && existing.length === 0);
+              if (isEmpty && newVal && (Array.isArray(newVal) ? newVal.length > 0 : true)) {
+                patch[field] = newVal;
+                updatedCount++;
+              }
+            };
+            maybeSet("description", linkedinData?.description ?? llmResult.description);
+            maybeSet("industry", linkedinData?.industry ?? llmResult.industry);
+            maybeSet("location", linkedinData?.location ?? llmResult.location);
+            maybeSet("headcount", linkedinData?.headcount ?? llmResult.headcount);
+            maybeSet("website", linkedinData?.website ?? llmResult.website);
+            maybeSet("linkedinUrl", linkedinData?.linkedinUrl ?? llmResult.linkedinUrl);
+            maybeSet("techStack", llmResult.techStack);
+            maybeSet("aiProducts", llmResult.aiProducts);
+            if (llmResult.fundingStage && llmResult.fundingStage !== "Unknown") maybeSet("fundingStage", llmResult.fundingStage);
+            if (Array.isArray(llmResult.gpuUseCases) && llmResult.gpuUseCases.length > 0) maybeSet("gpuUseCases", llmResult.gpuUseCases);
+
+            if (Object.keys(patch).length > 0) {
+              const merged = { ...lead, ...patch };
+              const { score, breakdown } = scoreLead(merged);
+              const fitReason = generateLektraFitReason(merged);
+              const recommendedGpu = getRecommendedGpu(merged.gpuUseCases ?? []);
+              patch.score = score;
+              patch.scoreBreakdown = breakdown;
+              patch.lektraFitReason = fitReason;
+              patch.recommendedGpu = recommendedGpu;
+              await updateLead(lead.id, patch);
+              enrichedCount++;
+            }
+            results.push({ id: lead.id, companyName: lead.companyName, fieldsUpdated: updatedCount });
+          } catch { /* skip this lead */ }
+        }
+        return { total: incomplete.length, enriched: enrichedCount, results };
       }),
 
     importApollo: protectedProcedure

@@ -65,6 +65,10 @@ export const leads = mysqlTable("leads", {
   lektraFitReason: text("lektraFitReason"),
   recommendedGpu: mysqlEnum("recommendedGpu", ["H200", "RTX Pro 6000", "B200", "Multiple", "TBD"]).default("TBD"),
 
+  // Follow-up scheduling
+  followUpAt: timestamp("followUpAt"),
+  followUpNote: varchar("followUpNote", { length: 512 }),
+
   // Meta
   source: varchar("source", { length: 128 }),
   // e.g. "Apollo Import", "Manual", "LinkedIn"

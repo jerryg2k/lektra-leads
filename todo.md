@@ -90,3 +90,12 @@
 - [x] Feature 1: Re-enrich button on Lead Detail page (server reEnrich procedure + Sparkles button in header)
 - [x] Feature 2: Auto-enrich contacts on creation via LinkedIn (people search + headline/URL auto-fill + toast)
 - [x] Feature 3: Data completeness score (0-10) on lead cards and detail header (red<4, amber 4-7, green 8-10)
+
+## Next Steps Batch (Follow-up, Bulk Re-enrich, Export Filter)
+- [x] Follow-up scheduler: date picker on Lead Detail page (+1/3/5/7/14d shortcuts, note field, clear button)
+- [x] Follow-up: store followUpAt + followUpNote in leads table (schema + SQL migration)
+- [x] Follow-up: "Needs Attention" section on Dashboard (red border card, days overdue badge)
+- [x] Bulk re-enrich: "Bulk Re-enrich" button on Leads page (re-enriches all leads with completeness < 7)
+- [x] Bulk re-enrich: toast showing X/Y leads enriched after completion
+- [x] HubSpot export: completeness filter slider (0-10) with preset buttons (All, ≥5, ≥7, ≥9)
+- [x] HubSpot export: "Preview Count" button shows matching lead count before download

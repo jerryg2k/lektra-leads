@@ -12,7 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import {
   ArrowLeft,
+  Bell,
   Building2,
+  Calendar,
   Check,
   ChevronDown,
   ChevronUp,
@@ -42,6 +44,116 @@ import { useLocation, useParams } from "wouter";
 
 const PIPELINE_STAGES = ["New", "Contacted", "Qualified", "Closed Won", "Closed Lost"] as const;
 const NOTE_TYPES = ["Note", "Call", "Email", "Meeting", "Follow-up"] as const;
+
+// ─── Follow-Up Scheduler ──────────────────────────────────────────────────────
+function FollowUpButton({ leadId, currentFollowUpAt, currentNote }: {
+  leadId: number;
+  currentFollowUpAt?: Date | null;
+  currentNote?: string | null;
+}) {
+  const utils = trpc.useUtils();
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState<string>(
+    currentFollowUpAt
+      ? new Date(currentFollowUpAt).toISOString().split("T")[0]
+      : ""
+  );
+  const [note, setNote] = useState(currentNote ?? "");
+
+  const setFollowUpMutation = trpc.leads.setFollowUp.useMutation({
+    onSuccess: () => {
+      utils.leads.get.invalidate({ id: leadId });
+      utils.leads.overdueFollowUps.invalidate();
+      toast.success(date ? `Follow-up scheduled for ${new Date(date + "T12:00:00").toLocaleDateString()}` : "Follow-up cleared");
+      setOpen(false);
+    },
+    onError: (e) => toast.error("Failed to set follow-up: " + e.message),
+  });
+
+  const isOverdue = currentFollowUpAt && new Date(currentFollowUpAt) < new Date();
+  const isDueToday = currentFollowUpAt && (() => {
+    const d = new Date(currentFollowUpAt);
+    const today = new Date();
+    return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+  })();
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={`gap-1.5 border-border text-xs ${
+            isOverdue ? "border-red-500 text-red-400 hover:bg-red-500/10" :
+            isDueToday ? "border-amber-500 text-amber-400 hover:bg-amber-500/10" :
+            currentFollowUpAt ? "border-primary text-primary hover:bg-primary/10" : ""
+          }`}
+          title="Schedule a follow-up reminder"
+        >
+          <Bell className="h-3 w-3" />
+          {currentFollowUpAt
+            ? (isOverdue ? "Overdue" : isDueToday ? "Due Today" : new Date(currentFollowUpAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }))
+            : "Follow-up"}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-sm bg-card border-border">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-primary" />
+            Schedule Follow-up
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-1">
+          <div className="space-y-1.5">
+            <Label className="text-sm">Follow-up Date</Label>
+            <Input
+              type="date"
+              value={date}
+              min={new Date().toISOString().split("T")[0]}
+              onChange={e => setDate(e.target.value)}
+              className="bg-secondary border-border"
+            />
+            <div className="flex gap-2 mt-1">
+              {[1, 3, 5, 7, 14].map(days => (
+                <button key={days} onClick={() => {
+                  const d = new Date();
+                  d.setDate(d.getDate() + days);
+                  setDate(d.toISOString().split("T")[0]);
+                }} className="text-xs px-2 py-1 rounded border border-border text-muted-foreground hover:border-primary hover:text-primary transition-colors">
+                  +{days}d
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm">Note (optional)</Label>
+            <Textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="e.g. Send pricing deck, follow up on demo interest..."
+              className="bg-secondary border-border text-sm h-20 resize-none"
+            />
+          </div>
+          <div className="flex gap-2">
+            {currentFollowUpAt && (
+              <Button variant="outline" size="sm" className="text-muted-foreground border-border"
+                onClick={() => setFollowUpMutation.mutate({ id: leadId, followUpAt: null })}
+                disabled={setFollowUpMutation.isPending}>
+                Clear
+              </Button>
+            )}
+            <Button size="sm" className="flex-1"
+              onClick={() => setFollowUpMutation.mutate({ id: leadId, followUpAt: date || null, followUpNote: note || undefined })}
+              disabled={setFollowUpMutation.isPending || !date}>
+              {setFollowUpMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+              Save Follow-up
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function LeadDetail() {
   const params = useParams<{ id: string }>();
@@ -195,7 +307,7 @@ export default function LeadDetail() {
                     ))}
                   </SelectContent>
                 </Select>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button
                     variant="outline"
                     size="sm"
@@ -219,6 +331,11 @@ export default function LeadDetail() {
                     <RefreshCw className={`h-3 w-3 ${rescoreMutation.isPending ? "animate-spin" : ""}`} />
                     Re-score
                   </Button>
+                  <FollowUpButton
+                    leadId={id}
+                    currentFollowUpAt={(lead as any).followUpAt}
+                    currentNote={(lead as any).followUpNote}
+                  />
                   <Button
                     variant="ghost"
                     size="sm"

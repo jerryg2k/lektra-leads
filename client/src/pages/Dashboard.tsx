@@ -6,7 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/lib/trpc";
 import {
+  AlertCircle,
   BarChart3,
+  Bell,
   Building2,
   ChevronRight,
   Cpu,
@@ -28,6 +30,7 @@ export default function Dashboard() {
     isArchived: false,
   });
   const { data: allLeads } = trpc.leads.list.useQuery({ isArchived: false });
+  const { data: overdueLeads, isLoading: overdueLoading } = trpc.leads.overdueFollowUps.useQuery();
 
   const totalLeads = allLeads?.length ?? 0;
   const hotCount = allLeads?.filter((l) => (l.score ?? 0) >= 75).length ?? 0;
@@ -133,6 +136,48 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* Overdue Follow-ups */}
+        {(overdueLeads && overdueLeads.length > 0) && (
+          <Card className="bg-card border-red-500/30 border">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-semibold text-red-400 uppercase tracking-wider flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-400" />
+                Needs Attention — {overdueLeads.length} Overdue Follow-up{overdueLeads.length !== 1 ? "s" : ""}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-border">
+                {overdueLeads.map((lead: any) => {
+                  const daysOverdue = Math.floor((Date.now() - new Date(lead.followUpAt).getTime()) / 86400000);
+                  return (
+                    <button
+                      key={lead.id}
+                      onClick={() => setLocation(`/leads/${lead.id}`)}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors text-left"
+                    >
+                      <div className="h-9 w-9 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
+                        <Bell className="h-4 w-4 text-red-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm text-foreground truncate">{lead.companyName}</span>
+                          <span className="text-xs text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded-full shrink-0">
+                            {daysOverdue === 0 ? "Due today" : `${daysOverdue}d overdue`}
+                          </span>
+                        </div>
+                        {lead.followUpNote && (
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">{lead.followUpNote}</p>
+                        )}
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Hot Leads */}
         <Card className="bg-card border-border">
