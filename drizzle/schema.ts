@@ -164,6 +164,10 @@ export const userSettings = mysqlTable("userSettings", {
   digestDayOfWeek: int("digestDayOfWeek").default(1).notNull(),
   // 0=Sun, 1=Mon, ..., 6=Sat
   digestEnabled: boolean("digestEnabled").default(true).notNull(),
+  // Auto-scan preferences
+  scanKeywords: varchar("scanKeywords", { length: 500 }).default(""),
+  // Comma-separated custom search themes e.g. "robotics,drug discovery,video generation"
+  scanFrequency: mysqlEnum("scanFrequency", ["daily", "every3days", "weekly"]).default("daily").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

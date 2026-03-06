@@ -185,3 +185,17 @@
 - [x] Discover page: "Run Now" button with loading state
 - [x] Discover page: scan history log table
 - [x] Owner notification when scan completes (X new leads added)
+
+## GTC 2026 & Scan Polish (new request)
+- [x] Settings: scan keyword themes field (comma-separated custom search terms)
+- [x] Settings: scan frequency control (daily / every 3 days / weekly)
+- [x] Backend: persist scanKeywords and scanFrequency in userSettings table
+- [x] dailyScan.ts: read scanKeywords from userSettings and inject into LLM prompt
+- [x] dailyScan.ts: respect scanFrequency (skip run if not due based on last run date)
+- [x] Leads page: "Pending Review" filter tab for auto-scan tagged leads
+- [x] Leads page: Approve (keep) / Archive action on auto-scan leads in review queue
+- [x] Business Card Scanner: dedicated page with camera capture or image upload
+- [x] Business Card Scanner: LLM vision OCR extracts name, title, company, email, phone, website
+- [x] Business Card Scanner: pre-filled Add Lead form from extracted data with edit before save
+- [x] Business Card Scanner: sidebar nav item with camera icon
+- [x] Business Card Scanner: GTC 2026 event tag auto-applied to scanned leads

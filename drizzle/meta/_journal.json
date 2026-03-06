@@ -57,6 +57,20 @@
       "when": 1772754939726,
       "tag": "0007_plain_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1772756829619,
+      "tag": "0008_curvy_rhino",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1772756862863,
+      "tag": "0009_round_white_queen",
+      "breakpoints": true
     }
   ]
 }

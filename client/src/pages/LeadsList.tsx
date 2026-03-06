@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { Bell, Building2, Check, ChevronDown, Download, Filter, Loader2, Phone, Plus, Search, Sparkles, X } from "lucide-react";
+import { Bell, Building2, Check, ChevronDown, Download, Filter, Loader2, Phone, Plus, ScanLine, Search, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -83,6 +83,14 @@ export default function LeadsList() {
     },
     onError: () => toast.error("Bulk re-enrich failed"),
   });
+
+  const [pendingReviewMode, setPendingReviewMode] = useState(false);
+
+  // When pending review mode is on, filter to auto-scan tagged leads
+  const autoScanLeads = leads?.filter((l: any) =>
+    Array.isArray(l.tags) ? l.tags.includes("auto-scan") : false
+  ) ?? [];
+  const displayedLeads = pendingReviewMode ? autoScanLeads : leads ?? [];
 
   const hasActiveFilters = !!(industry || fundingStage || pipelineStage || minScore !== undefined);
 
@@ -202,6 +210,39 @@ export default function LeadsList() {
           </div>
         </div>
 
+        {/* Quick filter tabs */}
+        <div className="flex gap-1 p-1 bg-secondary/50 rounded-xl w-fit">
+          <button
+            onClick={() => setPendingReviewMode(false)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              !pendingReviewMode
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All Leads
+            {leads && <span className="ml-1.5 text-xs text-muted-foreground">({leads.length})</span>}
+          </button>
+          <button
+            onClick={() => setPendingReviewMode(true)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
+              pendingReviewMode
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ScanLine className="w-3.5 h-3.5" />
+            Pending Review
+            {autoScanLeads.length > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                pendingReviewMode ? "bg-amber-500/20 text-amber-400" : "bg-amber-500/20 text-amber-400"
+              }`}>
+                {autoScanLeads.length}
+              </span>
+            )}
+          </button>
+        </div>
+
         {/* Search + Filter Bar */}
         <div className="flex gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
@@ -298,12 +339,12 @@ export default function LeadsList() {
           <div className="space-y-2">
             {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
           </div>
-        ) : !leads || leads.length === 0 ? (
+        ) : displayedLeads.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
             <Building2 className="h-12 w-12 mx-auto mb-3 opacity-30" />
             <p className="font-medium">No leads found</p>
             <p className="text-sm mt-1">
-              {hasActiveFilters || search ? "Try adjusting your filters" : "Add your first lead or import from Apollo.io"}
+              {pendingReviewMode ? "No auto-scan leads pending review" : hasActiveFilters || search ? "Try adjusting your filters" : "Add your first lead or import from Apollo.io"}
             </p>
           </div>
         ) : (
@@ -324,7 +365,7 @@ export default function LeadsList() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {leads.map((lead) => (
+                  {displayedLeads.map((lead) => (
                     <tr
                       key={lead.id}
                       onClick={() => setLocation(`/leads/${lead.id}`)}
@@ -374,7 +415,7 @@ export default function LeadsList() {
 
             {/* Mobile Cards */}
             <div className="md:hidden space-y-2">
-              {leads.map((lead) => (
+              {displayedLeads.map((lead) => (
                 <button
                   key={lead.id}
                   onClick={() => setLocation(`/leads/${lead.id}`)}

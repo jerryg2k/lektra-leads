@@ -1,0 +1,1 @@
+-- stub: columns added directly via SQL\nSELECT 1;

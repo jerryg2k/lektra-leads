@@ -11,6 +11,7 @@ import Pipeline from "@/pages/Pipeline";
 import Discover from "@/pages/Discover";
 import Import from "./pages/Import";
 import Settings from "./pages/Settings";
+import BusinessCardScanner from "./pages/BusinessCardScanner";
 
 function Router() {
   return (
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/discover" component={Discover} />
       <Route path="/import" component={Import} />
       <Route path="/settings" component={Settings} />
+      <Route path="/scan-card" component={BusinessCardScanner} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

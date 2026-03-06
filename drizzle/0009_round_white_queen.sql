@@ -1,0 +1,1 @@
+ALTER TABLE `userSettings` MODIFY COLUMN `scanKeywords` varchar(500) DEFAULT '';

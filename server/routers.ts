@@ -257,8 +257,69 @@ function parseCSV(csvText: string): Record<string, string>[] {
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
+// ─── Card Scanner Router ─────────────────────────────────────────────────────
+
+const cardScannerRouter = router({
+  scan: protectedProcedure
+    .input(z.object({
+      imageUrl: z.string().url(),
+      eventTag: z.string().optional().default("GTC-2026"),
+    }))
+    .mutation(async ({ input }) => {
+      const prompt = `You are a business card OCR expert. Extract all information from this business card image and return it as a JSON object.\n\nExtract these fields (use null if not found):\n- name: full name of the person\n- title: job title\n- company: company name\n- email: email address\n- phone: phone number (include country code if shown)\n- website: company website URL\n- linkedin: LinkedIn URL if shown\n- location: city, state/country if shown\n- notes: any other relevant info on the card\n\nReturn ONLY valid JSON, no markdown, no explanation.`;
+
+      const response = await invokeLLM({
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: input.imageUrl, detail: "high" } },
+            ],
+          },
+        ],
+      });
+
+      const raw = response.choices[0]?.message?.content;
+      const text = typeof raw === "string" ? raw : JSON.stringify(raw);
+
+      let extracted: {
+        name?: string | null;
+        title?: string | null;
+        company?: string | null;
+        email?: string | null;
+        phone?: string | null;
+        website?: string | null;
+        linkedin?: string | null;
+        location?: string | null;
+        notes?: string | null;
+      } = {};
+
+      try {
+        const clean = text.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
+        extracted = JSON.parse(clean);
+      } catch {
+        extracted = { notes: text };
+      }
+
+      return {
+        name: extracted.name ?? null,
+        title: extracted.title ?? null,
+        company: extracted.company ?? null,
+        email: extracted.email ?? null,
+        phone: extracted.phone ?? null,
+        website: extracted.website ?? null,
+        linkedin: extracted.linkedin ?? null,
+        location: extracted.location ?? null,
+        notes: extracted.notes ?? null,
+        eventTag: input.eventTag,
+      };
+    }),
+});
+
 export const appRouter = router({
   system: systemRouter,
+  cardScanner: cardScannerRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -313,6 +374,8 @@ export const appRouter = router({
         digestTimezone: z.string().optional(),
         digestDayOfWeek: z.number().min(0).max(6).optional(),
         digestEnabled: z.boolean().optional(),
+        scanKeywords: z.string().max(500).optional(),
+        scanFrequency: z.enum(["daily", "every3days", "weekly"]).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         await upsertUserSettings(ctx.user.openId, input);
@@ -341,7 +404,7 @@ export const appRouter = router({
         const { score, breakdown } = scoreLead(input);
         const fitReason = generateLektraFitReason(input);
         const recommendedGpu = getRecommendedGpu(input.gpuUseCases);
-        await createLead({
+        const newLead = await createLead({
           ...input,
           score,
           scoreBreakdown: breakdown,
@@ -349,7 +412,7 @@ export const appRouter = router({
           recommendedGpu: recommendedGpu as any,
           assignedTo: input.assignedTo ?? ctx.user.name ?? undefined,
         });
-        return { success: true };
+        return { success: true, id: (newLead as any)?.insertId ?? null };
       }),
 
     update: protectedProcedure

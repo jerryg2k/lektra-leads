@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import multer from "multer";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
@@ -9,6 +10,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { startWeeklyDigestCron } from "../weeklyDigest";
 import { startDailyScanCron } from "../dailyScan";
+import { storagePut } from "../storage";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -35,6 +37,20 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  // Business card image upload endpoint
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 16 * 1024 * 1024 } });
+  app.post("/api/upload-card", upload.single("file"), async (req: any, res: any) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "No file" });
+      const suffix = Date.now().toString(36);
+      const key = `business-cards/${suffix}.jpg`;
+      const { url } = await storagePut(key, req.file.buffer, req.file.mimetype || "image/jpeg");
+      res.json({ url });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API
