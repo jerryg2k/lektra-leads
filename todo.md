@@ -255,3 +255,8 @@
 - [x] NFC tag type guide tooltip with link to NTAG213/215/216 tags
 - [x] Persist My Card profile (name, title, phone, etc.) to DB per user
 - [x] QR code camera scanner using jsQR for contactless lead capture
+
+## Remove NFC Exchange (simplification)
+- [x] Remove NfcExchange.tsx page file
+- [x] Remove NFC route from App.tsx
+- [x] Remove NFC nav item from DashboardLayout.tsx
