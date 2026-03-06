@@ -31,9 +31,10 @@ import {
 import { discoverRouter } from "./routers/discover";
 import { invokeLLM } from "./_core/llm";
 import { getDb } from "./db";
-import { emailSequences, notes } from "../drizzle/schema";
+import { emailSequences, notes, scanHistory, leads } from "../drizzle/schema";
 import { sendWeeklyDigest } from "./weeklyDigest";
-import { eq, and } from "drizzle-orm";
+import { runDailyScan } from "./dailyScan";
+import { eq, and, desc } from "drizzle-orm";
 
 // ─── Zod Schemas ──────────────────────────────────────────────────────────────
 
@@ -268,6 +269,36 @@ export const appRouter = router({
   }),
 
   discover: discoverRouter,
+
+  // ─── Scan ───────────────────────────────────────────────────────────────────
+
+  scan: router({
+    runNow: protectedProcedure.mutation(async () => {
+      const result = await runDailyScan("manual");
+      return result;
+    }),
+
+    history: protectedProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+      return db.select().from(scanHistory).orderBy(desc(scanHistory.runAt)).limit(20);
+    }),
+
+    latestAddedLeads: protectedProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+      // Get the most recent completed scan
+      const [lastScan] = await db
+        .select()
+        .from(scanHistory)
+        .where(eq(scanHistory.status, "completed"))
+        .orderBy(desc(scanHistory.runAt))
+        .limit(1);
+      if (!lastScan || !lastScan.addedLeadIds || lastScan.addedLeadIds.length === 0) return [];
+      const { inArray } = await import("drizzle-orm");
+      return db.select().from(leads).where(inArray(leads.id, lastScan.addedLeadIds));
+    }),
+  }),
 
   // ─── Settings ───────────────────────────────────────────────────────────────
 

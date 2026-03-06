@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { startWeeklyDigestCron } from "../weeklyDigest";
+import { startDailyScanCron } from "../dailyScan";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -62,6 +63,8 @@ async function startServer() {
     console.log(`Server running on http://localhost:${port}/`);
     // Start weekly BD digest cron (every Monday 07:00 UTC)
     startWeeklyDigestCron();
+    // Start daily AI startup scan cron (every day 06:00 UTC)
+    startDailyScanCron();
   });
 }
 

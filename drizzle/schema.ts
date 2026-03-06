@@ -69,6 +69,9 @@ export const leads = mysqlTable("leads", {
   followUpAt: timestamp("followUpAt"),
   followUpNote: varchar("followUpNote", { length: 512 }),
 
+  // Tags (free-form labels for segmentation)
+  tags: json("tags").$type<string[]>(),
+
   // Meta
   source: varchar("source", { length: 128 }),
   // e.g. "Apollo Import", "Manual", "LinkedIn"
@@ -167,3 +170,21 @@ export const userSettings = mysqlTable("userSettings", {
 
 export type UserSettings = typeof userSettings.$inferSelect;
 export type InsertUserSettings = typeof userSettings.$inferInsert;
+
+// ─── Scan History ─────────────────────────────────────────────────────────────
+
+export const scanHistory = mysqlTable("scanHistory", {
+  id: int("id").autoincrement().primaryKey(),
+  runAt: timestamp("runAt").defaultNow().notNull(),
+  trigger: mysqlEnum("trigger", ["cron", "manual"]).default("cron").notNull(),
+  status: mysqlEnum("status", ["running", "completed", "failed"]).default("running").notNull(),
+  found: int("found").default(0).notNull(),
+  added: int("added").default(0).notNull(),
+  skipped: int("skipped").default(0).notNull(),
+  errorMsg: text("errorMsg"),
+  addedLeadIds: json("addedLeadIds").$type<number[]>(),
+  completedAt: timestamp("completedAt"),
+});
+
+export type ScanHistory = typeof scanHistory.$inferSelect;
+export type InsertScanHistory = typeof scanHistory.$inferInsert;

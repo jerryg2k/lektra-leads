@@ -162,3 +162,26 @@
 - [x] Follow-up history collapsible section on Lead Detail (filters activity log to Follow-up notes only)
 - [x] Overdue badge on mobile bottom nav bar (mirrors sidebar badge)
 - [x] Weekly digest email opens with overdue follow-up count before top prospects list
+
+## CSV Export, Tagging & Bulk Actions (new request)
+- [ ] CSV export button on Leads page (exports company, stage, score, follow-up date, last note, tags)
+- [ ] Backend: leads.exportCsv procedure returning CSV string
+- [ ] Lead tagging: tags column on leads table (JSON array of strings)
+- [ ] Backend: leads.updateTags procedure
+- [ ] Tag input UI on Lead Detail page (add/remove tags inline)
+- [ ] Tag filter on Leads list page
+- [ ] Bulk stage update: checkboxes on Leads list rows
+- [ ] Bulk action bar appears when 1+ leads selected (Move to Stage dropdown + Apply button)
+- [ ] Backend: leads.bulkUpdateStage procedure
+
+## Daily Auto-Scan for New AI Startups (new request)
+- [x] scanHistory table: id, runAt, source, found, added, skipped, status, errorMsg
+- [x] Backend: dailyScan function — searches web for new AI startups, enriches via LLM, deduplicates, inserts qualifying leads
+- [x] Cron job: runs daily at 6 AM UTC
+- [x] Backend: scan.runNow procedure (manual trigger, protected)
+- [x] Backend: scan.history procedure (list recent scan runs)
+- [x] Backend: scan.latestResults procedure (leads added in last scan)
+- [x] Discover page: "Auto-Scan" tab showing last run time, stats, and leads added
+- [x] Discover page: "Run Now" button with loading state
+- [x] Discover page: scan history log table
+- [x] Owner notification when scan completes (X new leads added)
