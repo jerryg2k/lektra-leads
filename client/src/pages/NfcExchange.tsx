@@ -7,15 +7,19 @@ import { trpc } from "@/lib/trpc";
 import {
   AlertCircle,
   Check,
+  ExternalLink,
+  HelpCircle,
   Loader2,
   QrCode,
   Radio,
+  Save,
   Smartphone,
   UserPlus,
   Wifi,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import jsQR from "jsqr";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
@@ -62,12 +66,14 @@ export default function NfcExchange() {
   const [, setLocation] = useLocation();
 
   // My card fields
-  const [myName, setMyName] = useState(user?.name ?? "");
+  const [myName, setMyName] = useState("");
   const [myTitle, setMyTitle] = useState("");
   const [myCompany, setMyCompany] = useState("Lektra Cloud");
-  const [myEmail, setMyEmail] = useState(user?.email ?? "");
+  const [myEmail, setMyEmail] = useState("");
   const [myPhone, setMyPhone] = useState("");
   const [myWebsite, setMyWebsite] = useState("https://lektracloud.com");
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [showTagGuide, setShowTagGuide] = useState(false);
 
   // NFC state
   const [mode, setMode] = useState<"idle" | "writing" | "reading" | "success_write" | "success_read">("idle");
@@ -75,11 +81,38 @@ export default function NfcExchange() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Update name/email when user loads
+  // Load saved card profile from DB
+  const { data: settingsData } = trpc.settings.get.useQuery();
+  const saveSettingsMutation = trpc.settings.update.useMutation({
+    onSuccess: () => toast.success("Card profile saved!"),
+    onError: () => toast.error("Failed to save profile"),
+  });
+
+  // Populate fields from saved settings once loaded
   useEffect(() => {
-    if (user?.name && !myName) setMyName(user.name);
-    if (user?.email && !myEmail) setMyEmail(user.email);
-  }, [user]);
+    if (settingsData && !profileLoaded) {
+      setProfileLoaded(true);
+      if (settingsData.cardName) setMyName(settingsData.cardName);
+      else if (user?.name) setMyName(user.name);
+      if (settingsData.cardTitle) setMyTitle(settingsData.cardTitle);
+      if (settingsData.cardCompany) setMyCompany(settingsData.cardCompany);
+      if (settingsData.cardEmail) setMyEmail(settingsData.cardEmail);
+      else if (user?.email) setMyEmail(user.email);
+      if (settingsData.cardPhone) setMyPhone(settingsData.cardPhone);
+      if (settingsData.cardWebsite) setMyWebsite(settingsData.cardWebsite);
+    }
+  }, [settingsData, user, profileLoaded]);
+
+  const handleSaveProfile = () => {
+    saveSettingsMutation.mutate({
+      cardName: myName,
+      cardTitle: myTitle,
+      cardCompany: myCompany,
+      cardEmail: myEmail,
+      cardPhone: myPhone,
+      cardWebsite: myWebsite,
+    });
+  };
 
   // Generate QR code using a free API (no key needed)
   useEffect(() => {
@@ -252,10 +285,47 @@ export default function NfcExchange() {
 
         {/* My Card Setup */}
         <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-          <h2 className="font-semibold text-foreground flex items-center gap-2">
-            <Smartphone className="h-4 w-4 text-primary" />
-            My Contact Card
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-foreground flex items-center gap-2">
+              <Smartphone className="h-4 w-4 text-primary" />
+              My Contact Card
+            </h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowTagGuide(!showTagGuide)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <HelpCircle className="h-4 w-4" />
+                Which NFC tags work?
+              </button>
+            </div>
+          </div>
+
+          {/* NFC Tag Guide */}
+          {showTagGuide && (
+            <div className="bg-secondary/60 border border-border rounded-lg p-4 space-y-2">
+              <p className="text-sm font-medium text-foreground">Compatible NFC Tags</p>
+              <p className="text-xs text-muted-foreground">Use any of these standard NDEF-writable tags — available on Amazon for ~$10 for a pack of 10:</p>
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                {[{name: "NTAG213", size: "144 bytes", best: "Business cards"}, {name: "NTAG215", size: "504 bytes", best: "Full vCards"}, {name: "NTAG216", size: "888 bytes", best: "Rich profiles"}].map(t => (
+                  <div key={t.name} className="bg-card rounded-lg p-2.5 text-center border border-border">
+                    <p className="text-sm font-semibold text-primary">{t.name}</p>
+                    <p className="text-xs text-muted-foreground">{t.size}</p>
+                    <p className="text-xs text-muted-foreground">{t.best}</p>
+                  </div>
+                ))}
+              </div>
+              <a
+                href="https://www.amazon.com/s?k=NTAG215+NFC+cards"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+              >
+                <ExternalLink className="h-3 w-3" /> Shop NTAG215 cards on Amazon
+              </a>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Full Name</Label>
@@ -281,6 +351,18 @@ export default function NfcExchange() {
               <Label className="text-xs text-muted-foreground">Website</Label>
               <Input value={myWebsite} onChange={(e) => setMyWebsite(e.target.value)} placeholder="https://..." className="bg-secondary border-border" />
             </div>
+          </div>
+          <div className="flex justify-end pt-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSaveProfile}
+              disabled={saveSettingsMutation.isPending}
+              className="gap-2 border-border"
+            >
+              {saveSettingsMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Save Profile
+            </Button>
           </div>
         </div>
 
@@ -400,7 +482,127 @@ export default function NfcExchange() {
           )}
           <p className="text-xs text-center text-muted-foreground">Updates live as you edit your card above</p>
         </div>
+
+        {/* QR Camera Scanner */}
+        <QrCameraScanner onContact={(card) => { setReceivedCard(card); setMode("success_read"); }} />
+
       </div>
     </DashboardLayout>
+  );
+}
+
+// ─── QR Camera Scanner Component ────────────────────────────────────────────
+
+function QrCameraScanner({ onContact }: { onContact: (card: ReturnType<typeof parseVCard>) => void }) {
+  const [scanning, setScanning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number | null>(null);
+
+  const stopCamera = useCallback(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    setScanning(false);
+  }, []);
+
+  const scanFrame = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+      rafRef.current = requestAnimationFrame(scanFrame);
+      return;
+    }
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height);
+    if (code?.data) {
+      stopCamera();
+      const parsed = parseVCard(code.data);
+      if (parsed.name || parsed.company || parsed.email) {
+        onContact(parsed);
+      } else if (code.data.trim()) {
+        // Plain text — treat as name
+        onContact({ name: code.data.trim() });
+      } else {
+        setError("QR code found but no contact data detected. Try a vCard QR code.");
+      }
+      return;
+    }
+    rafRef.current = requestAnimationFrame(scanFrame);
+  }, [onContact, stopCamera]);
+
+  const startCamera = useCallback(async () => {
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setScanning(true);
+      rafRef.current = requestAnimationFrame(scanFrame);
+    } catch (e: any) {
+      if (e.name === "NotAllowedError") {
+        setError("Camera permission denied. Please allow camera access in your browser settings.");
+      } else {
+        setError("Could not start camera: " + (e.message || "Unknown error"));
+      }
+    }
+  }, [scanFrame]);
+
+  useEffect(() => () => stopCamera(), [stopCamera]);
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+      <h2 className="font-semibold text-foreground flex items-center gap-2">
+        <QrCode className="h-4 w-4 text-primary" />
+        Scan QR Code
+        <span className="text-xs text-muted-foreground font-normal ml-1">— capture their contact from a QR code</span>
+      </h2>
+      <p className="text-xs text-muted-foreground">Point your camera at someone's vCard QR code to instantly capture their contact as a lead.</p>
+
+      {error && (
+        <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+          <AlertCircle className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
+          <p className="text-xs text-red-300">{error}</p>
+        </div>
+      )}
+
+      {scanning ? (
+        <div className="space-y-3">
+          <div className="relative rounded-xl overflow-hidden bg-black aspect-video">
+            <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+            {/* Scanning overlay */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-48 h-48 border-2 border-primary rounded-xl opacity-70" />
+            </div>
+            <div className="absolute bottom-3 left-0 right-0 text-center">
+              <span className="text-xs text-white/80 bg-black/50 px-2 py-1 rounded-full">Align QR code within the frame</span>
+            </div>
+          </div>
+          <canvas ref={canvasRef} className="hidden" />
+          <Button variant="outline" size="sm" onClick={stopCamera} className="gap-2 w-full border-border">
+            <X className="h-4 w-4" /> Stop Scanner
+          </Button>
+        </div>
+      ) : (
+        <Button onClick={startCamera} variant="outline" className="gap-2 w-full border-border">
+          <QrCode className="h-4 w-4 text-primary" />
+          Open Camera to Scan QR
+        </Button>
+      )}
+    </div>
   );
 }

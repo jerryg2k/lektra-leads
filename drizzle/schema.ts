@@ -168,6 +168,13 @@ export const userSettings = mysqlTable("userSettings", {
   scanKeywords: varchar("scanKeywords", { length: 500 }).default(""),
   // Comma-separated custom search themes e.g. "robotics,drug discovery,video generation"
   scanFrequency: mysqlEnum("scanFrequency", ["daily", "every3days", "weekly"]).default("daily").notNull(),
+  // NFC / Card profile
+  cardName: varchar("cardName", { length: 128 }).default(""),
+  cardTitle: varchar("cardTitle", { length: 128 }).default(""),
+  cardCompany: varchar("cardCompany", { length: 128 }).default(""),
+  cardEmail: varchar("cardEmail", { length: 256 }).default(""),
+  cardPhone: varchar("cardPhone", { length: 64 }).default(""),
+  cardWebsite: varchar("cardWebsite", { length: 256 }).default(""),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

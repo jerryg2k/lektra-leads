@@ -250,3 +250,8 @@
 ## Bug: NFC Write Failed (reported)
 - [x] Fix NFC write failure on NFC Exchange page
 - [x] Improve error messages and user guidance for NFC write
+
+## NFC Exchange Improvements (new request)
+- [x] NFC tag type guide tooltip with link to NTAG213/215/216 tags
+- [x] Persist My Card profile (name, title, phone, etc.) to DB per user
+- [x] QR code camera scanner using jsQR for contactless lead capture

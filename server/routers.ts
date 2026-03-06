@@ -512,7 +512,7 @@ export const appRouter = router({
   settings: router({
     get: protectedProcedure.query(async ({ ctx }) => {
       const s = await getUserSettings(ctx.user.openId);
-      return s ?? { digestHour: 7, digestTimezone: "UTC", digestDayOfWeek: 1, digestEnabled: true };
+      return s ?? { digestHour: 7, digestTimezone: "UTC", digestDayOfWeek: 1, digestEnabled: true, scanKeywords: "", scanFrequency: "daily" as const, cardName: "", cardTitle: "", cardCompany: "", cardEmail: "", cardPhone: "", cardWebsite: "" };
     }),
     update: protectedProcedure
       .input(z.object({
@@ -522,6 +522,12 @@ export const appRouter = router({
         digestEnabled: z.boolean().optional(),
         scanKeywords: z.string().max(500).optional(),
         scanFrequency: z.enum(["daily", "every3days", "weekly"]).optional(),
+        cardName: z.string().max(128).optional(),
+        cardTitle: z.string().max(128).optional(),
+        cardCompany: z.string().max(128).optional(),
+        cardEmail: z.string().max(256).optional(),
+        cardPhone: z.string().max(64).optional(),
+        cardWebsite: z.string().max(256).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         await upsertUserSettings(ctx.user.openId, input);
