@@ -400,6 +400,30 @@ export const appRouter = router({
       const { inArray } = await import("drizzle-orm");
       return db.select().from(leads).where(inArray(leads.id, lastScan.addedLeadIds));
     }),
+
+    gtcStats: protectedProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return { totalLeads: 0, cardScans: 0, nfcExchanges: 0, topLead: null };
+      const { like, or } = await import("drizzle-orm");
+      const gtcLeads = await db
+        .select()
+        .from(leads)
+        .where(or(
+          like(leads.source, "%GTC%"),
+          like(leads.tags, "%GTC-2026%"),
+        ));
+      const cardScans = gtcLeads.filter((l) => l.source?.includes("Card Scan")).length;
+      const nfcExchanges = gtcLeads.filter((l) => l.source?.includes("NFC")).length;
+      const topLead = gtcLeads.length > 0
+        ? gtcLeads.reduce((best, l) => (l.score ?? 0) > (best.score ?? 0) ? l : best)
+        : null;
+      return {
+        totalLeads: gtcLeads.length,
+        cardScans,
+        nfcExchanges,
+        topLead: topLead ? { id: topLead.id, companyName: topLead.companyName, score: topLead.score } : null,
+      };
+    }),
   }),
 
   // ─── Settings ───────────────────────────────────────────────────────────────
@@ -1316,6 +1340,12 @@ Return JSON: { "description": string, "industry": string, "subIndustry": string,
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
+        // Detect if this is a GTC 2026 lead for a personalised intro
+        const isGtcLead = (lead.source?.includes("GTC") || (Array.isArray(lead.tags) ? lead.tags : []).includes("GTC-2026"));
+        const gtcContext = isGtcLead
+          ? `\n\nIMPORTANT: You met this person at NVIDIA GTC 2026 in San Jose. For the Day 1 email, open with a brief reference to meeting them at GTC — e.g. "Great connecting at GTC last week" or "Enjoyed our chat at GTC". Keep it natural and brief (one sentence max). For follow-ups, you don't need to mention GTC again.`
+          : "";
+
         // Delete any existing sequence for this lead+contact combo
         await db.delete(emailSequences).where(
           and(
@@ -1360,7 +1390,7 @@ Jerry's writing style rules:
 - For follow-ups: acknowledge it's a follow-up briefly, add new value or angle
 - Never use buzzwords like "synergy", "leverage", "circle back"
 
-Return JSON with exactly: { "subject": "...", "body": "..." }`;
+Return JSON with exactly: { "subject": "...", "body": "..." }${gtcContext}`;
 
           const response = await invokeLLM({
             messages: [{ role: "user", content: prompt }],

@@ -15,12 +15,16 @@ import {
   ChevronRight,
   Cpu,
   Flame,
+  Layers,
   Loader2,
   Mail,
   MessageSquare,
   Pencil,
   Plus,
+  Radio,
+  ScanLine,
   TrendingUp,
+  Trophy,
   Users,
   X,
   Zap,
@@ -42,6 +46,7 @@ export default function Dashboard() {
   const { data: allLeads } = trpc.leads.list.useQuery({ isArchived: false });
   const { data: overdueLeads, isLoading: overdueLoading } = trpc.leads.overdueFollowUps.useQuery();
   const { data: sourceStats } = trpc.leads.sourceStats.useQuery();
+  const { data: gtcStats } = trpc.scan.gtcStats.useQuery();
 
   const sendDigestMutation = trpc.leads.sendDigest.useMutation({
     onSuccess: (result) => {
@@ -248,6 +253,59 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* GTC 2026 Leaderboard */}
+        {gtcStats && gtcStats.totalLeads > 0 && (
+          <Card className="bg-card border-primary/30 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-yellow-400" />
+                GTC 2026 Conference
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-foreground">{gtcStats.totalLeads}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Total Leads</p>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <ScanLine className="h-4 w-4 text-primary" />
+                    <p className="text-2xl font-bold text-foreground">{gtcStats.cardScans}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Card Scans</p>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <Radio className="h-4 w-4 text-emerald-400" />
+                    <p className="text-2xl font-bold text-foreground">{gtcStats.nfcExchanges}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">NFC Taps</p>
+                </div>
+              </div>
+              {gtcStats.topLead && (
+                <div className="flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-3 py-2">
+                  <Trophy className="h-4 w-4 text-yellow-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground">Top Lead</p>
+                    <p className="text-sm font-semibold text-foreground truncate">{gtcStats.topLead.companyName}</p>
+                  </div>
+                  <span className="text-sm font-bold text-yellow-400">{gtcStats.topLead.score}</span>
+                </div>
+              )}
+              <div className="flex gap-2 mt-3">
+                <Button size="sm" variant="outline" className="flex-1 text-xs gap-1.5 h-7" onClick={() => setLocation("/batch-scan")}>
+                  <Layers className="h-3 w-3" /> Batch Scan
+                </Button>
+                <Button size="sm" variant="outline" className="flex-1 text-xs gap-1.5 h-7" onClick={() => setLocation("/leads?source=GTC")}>
+                  <Building2 className="h-3 w-3" /> View All
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Lead Source Analytics */}
         {sourceStats && sourceStats.length > 0 && (

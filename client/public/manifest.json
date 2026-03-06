@@ -1,0 +1,62 @@
+{
+  "name": "Lektra Cloud Lead Intelligence",
+  "short_name": "Lektra",
+  "description": "GPU cloud lead intelligence and pipeline management for Lektra Cloud BD team",
+  "start_url": "/scan-card",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0a0a",
+  "theme_color": "#22c55e",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Scan Business Card",
+      "short_name": "Scan Card",
+      "description": "Scan a business card and add as lead",
+      "url": "/scan-card",
+      "icons": [{ "src": "/favicon.ico", "sizes": "48x48" }]
+    },
+    {
+      "name": "Batch Scan Session",
+      "short_name": "Batch Scan",
+      "description": "Scan multiple cards in one session",
+      "url": "/batch-scan",
+      "icons": [{ "src": "/favicon.ico", "sizes": "48x48" }]
+    },
+    {
+      "name": "NFC Exchange",
+      "short_name": "NFC",
+      "description": "Exchange contact via NFC tap",
+      "url": "/nfc",
+      "icons": [{ "src": "/favicon.ico", "sizes": "48x48" }]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "View pipeline and GTC leaderboard",
+      "url": "/",
+      "icons": [{ "src": "/favicon.ico", "sizes": "48x48" }]
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "en-US"
+}

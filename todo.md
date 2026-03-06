@@ -220,3 +220,11 @@
 - [x] Lead source attribution: set source="GTC-2026 Card Scan" on card scan leads
 - [x] Lead source attribution: set source="GTC-2026 NFC" on NFC exchange leads
 - [x] Source field visible on Lead Detail and Leads list
+
+## GTC 2026 Finishing Touches (new request)
+- [x] GTC leaderboard widget on Dashboard (cards scanned, leads saved, top company by score)
+- [x] Backend: scan.gtcStats procedure (count GTC-tagged leads, top lead by score)
+- [x] GTC intro email template auto-selected in sequence generator for GTC-tagged leads
+- [x] Sequence generator: detect GTC-2026 tag and pre-fill intro context in LLM prompt
+- [x] PWA manifest.json with name, icons, start_url=/scan-card, display=standalone
+- [x] Link manifest in index.html for home screen install on Android/Galaxy Tab
