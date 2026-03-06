@@ -31,7 +31,7 @@ import {
 import { discoverRouter } from "./routers/discover";
 import { invokeLLM } from "./_core/llm";
 import { getDb } from "./db";
-import { emailSequences, notes, scanHistory, leads, cardScans } from "../drizzle/schema";
+import { emailSequences, notes, scanHistory, leads, cardScans, gtcTargets } from "../drizzle/schema";
 import { sendWeeklyDigest } from "./weeklyDigest";
 import { runDailyScan } from "./dailyScan";
 import { eq, and, desc } from "drizzle-orm";
@@ -426,7 +426,88 @@ export const appRouter = router({
     }),
   }),
 
-  // ─── Settings ───────────────────────────────────────────────────────────────
+  // ─── Settings  // ─── GTC Strategy ─────────────────────────────────────────────
+
+  gtc: router({
+    targets: protectedProcedure
+      .input(z.object({
+        tier: z.enum(["Must Meet", "High Value", "Worth Visiting", "all"]).optional(),
+        search: z.string().optional(),
+      }).optional())
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const { like, or: drizzleOr } = await import("drizzle-orm");
+        let rows = await db.select().from(gtcTargets).orderBy(desc(gtcTargets.priorityScore));
+        if (input?.tier && input.tier !== "all") {
+          rows = rows.filter((r) => r.priorityTier === input.tier);
+        }
+        if (input?.search) {
+          const q = input.search.toLowerCase();
+          rows = rows.filter((r) =>
+            r.companyName.toLowerCase().includes(q) ||
+            (r.contactName ?? "").toLowerCase().includes(q) ||
+            (r.description ?? "").toLowerCase().includes(q)
+          );
+        }
+        return rows;
+      }),
+
+    addToPipeline: protectedProcedure
+      .input(z.object({ targetId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [target] = await db.select().from(gtcTargets).where(eq(gtcTargets.id, input.targetId));
+        if (!target) throw new TRPCError({ code: "NOT_FOUND" });
+        const { scoreLead: scoreLeadFn, generateLektraFitReason: genFit, getRecommendedGpu: getGpu } = await import("./scoring");
+        const leadInput = {
+          companyName: target.companyName,
+          website: target.website ?? undefined,
+          description: target.description ?? undefined,
+          source: `GTC-2026 ${target.type}`,
+          tags: ["GTC-2026", target.priorityTier.replace(/ /g, "-")],
+          gpuUseCases: [] as string[],
+        };
+        const { score, breakdown } = scoreLeadFn(leadInput as any);
+        const fitReason = genFit(leadInput as any);
+        const recommendedGpu = getGpu(leadInput.gpuUseCases);
+        const newLead = await createLead({
+          ...leadInput,
+          score,
+          scoreBreakdown: breakdown,
+          lektraFitReason: fitReason,
+          recommendedGpu: recommendedGpu as any,
+          assignedTo: ctx.user.name ?? undefined,
+        } as any);
+        const leadId = (newLead as any)?.insertId;
+        // Mark target as added
+        await db.update(gtcTargets).set({ addedToLeadsId: leadId }).where(eq(gtcTargets.id, input.targetId));
+        // Add contact if we have one
+        if (target.contactName && leadId) {
+          const nameParts = target.contactName.split(" ");
+          await createContact({
+            leadId,
+            firstName: nameParts[0] ?? "",
+            lastName: nameParts.slice(1).join(" ") ?? "",
+            title: target.contactTitle ?? undefined,
+            isPrimary: true,
+          } as any);
+        }
+        return { success: true, leadId };
+      }),
+
+    updateNotes: protectedProcedure
+      .input(z.object({ targetId: z.number(), notes: z.string() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(gtcTargets).set({ notes: input.notes }).where(eq(gtcTargets.id, input.targetId));
+        return { success: true };
+      }),
+  }),
+
+  // ─── Settings ─────────────────────────────────────────────
 
   settings: router({
     get: protectedProcedure.query(async ({ ctx }) => {

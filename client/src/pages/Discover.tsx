@@ -359,7 +359,27 @@ function SeedCard({
 
 export default function Discover() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"discover" | "autoscan">("discover");
+  const [activeTab, setActiveTab] = useState<"discover" | "autoscan" | "gtc">("discover");
+  const [gtcTier, setGtcTier] = useState<"Must Meet" | "High Value" | "Worth Visiting" | "all">("all");
+  const [gtcSearch, setGtcSearch] = useState("");
+  const [gtcExpandedId, setGtcExpandedId] = useState<number | null>(null);
+  const [gtcNotesMap, setGtcNotesMap] = useState<Record<number, string>>({});
+
+  const { data: gtcTargets, isLoading: gtcLoading, refetch: refetchGtc } = trpc.gtc.targets.useQuery(
+    { tier: gtcTier, search: gtcSearch || undefined },
+    { enabled: activeTab === "gtc" }
+  );
+  const addToPipelineMutation = trpc.gtc.addToPipeline.useMutation({
+    onSuccess: (data) => {
+      refetchGtc();
+      utils.leads.list.invalidate();
+      toast.success("Added to pipeline!");
+    },
+    onError: (e) => toast.error(`Failed: ${e.message}`),
+  });
+  const updateNotesMutation = trpc.gtc.updateNotes.useMutation({
+    onSuccess: () => { refetchGtc(); toast.success("Notes saved"); },
+  });
   const [keyword, setKeyword] = useState("");
   const [gpuUseCase, setGpuUseCase] = useState("all");
   const [fundingStage, setFundingStage] = useState("all");
@@ -543,6 +563,20 @@ export default function Discover() {
                   {scanHistoryData[0].added} new
                 </span>
               )}
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab("gtc")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeTab === "gtc"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              GTC Strategy
+              <span className="bg-amber-500/20 text-amber-400 text-xs px-1.5 py-0.5 rounded-full">34</span>
             </span>
           </button>
         </div>
@@ -843,6 +877,170 @@ export default function Discover() {
           </div>
         )}
         </>)}
+
+        {/* GTC Strategy Panel */}
+        {activeTab === "gtc" && (
+          <div className="space-y-5">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex-1">
+                <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-amber-400" />
+                  GTC 2026 Strategy Targets
+                </h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  34 curated targets — sponsors, speakers, and exhibitors prioritized by GPU spend potential for Lektra.
+                </p>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {(["all", "Must Meet", "High Value", "Worth Visiting"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setGtcTier(t)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                      gtcTier === t
+                        ? t === "Must Meet" ? "bg-red-500/20 text-red-400 border-red-500/40"
+                          : t === "High Value" ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                          : t === "Worth Visiting" ? "bg-blue-500/20 text-blue-400 border-blue-500/40"
+                          : "bg-primary/20 text-primary border-primary/40"
+                        : "bg-transparent text-muted-foreground border-border hover:border-foreground/30"
+                    }`}
+                  >
+                    {t === "all" ? "All Tiers" : t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search companies, contacts..."
+                value={gtcSearch}
+                onChange={(e) => setGtcSearch(e.target.value)}
+                className="pl-9 h-9 text-sm"
+              />
+            </div>
+
+            {/* Targets list */}
+            {gtcLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : !gtcTargets || gtcTargets.length === 0 ? (
+              <div className="text-center py-16 text-muted-foreground text-sm">No targets found.</div>
+            ) : (
+              <div className="space-y-3">
+                {gtcTargets.map((target) => {
+                  const isExpanded = gtcExpandedId === target.id;
+                  const isAdded = !!target.addedToLeadsId;
+                  const tierColor = target.priorityTier === "Must Meet"
+                    ? "text-red-400 bg-red-500/10 border-red-500/30"
+                    : target.priorityTier === "High Value"
+                    ? "text-amber-400 bg-amber-500/10 border-amber-500/30"
+                    : "text-blue-400 bg-blue-500/10 border-blue-500/30";
+                  return (
+                    <Card key={target.id} className={`border-border bg-card transition-all ${
+                      target.priorityTier === "Must Meet" ? "border-l-2 border-l-red-500" :
+                      target.priorityTier === "High Value" ? "border-l-2 border-l-amber-500" :
+                      "border-l-2 border-l-blue-500"
+                    }`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-foreground text-sm">{target.companyName}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${tierColor}`}>
+                                {target.priorityTier}
+                              </span>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
+                                {target.type}
+                              </span>
+                              {target.priorityScore >= 90 && (
+                                <span className="text-xs text-amber-400 flex items-center gap-0.5">
+                                  <Zap className="w-3 h-3" /> Score {target.priorityScore}
+                                </span>
+                              )}
+                            </div>
+                            {target.contactName && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                <span className="font-medium text-foreground/80">{target.contactName}</span>
+                                {target.contactTitle && <span className="ml-1">· {target.contactTitle}</span>}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{target.description}</p>
+                            {target.gpuFitReason && (
+                              <p className="text-xs text-primary/80 mt-1.5 italic">💡 {target.gpuFitReason}</p>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-2 shrink-0">
+                            {isAdded ? (
+                              <span className="text-xs text-emerald-400 flex items-center gap-1">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> In Pipeline
+                              </span>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-1"
+                                onClick={() => addToPipelineMutation.mutate({ targetId: target.id })}
+                                disabled={addToPipelineMutation.isPending}
+                              >
+                                <BookmarkPlus className="w-3.5 h-3.5" />
+                                Add
+                              </Button>
+                            )}
+                            <button
+                              onClick={() => setGtcExpandedId(isExpanded ? null : target.id)}
+                              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5"
+                            >
+                              {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                              Notes
+                            </button>
+                          </div>
+                        </div>
+                        {isExpanded && (
+                          <div className="mt-3 pt-3 border-t border-border space-y-2">
+                            <Label className="text-xs text-muted-foreground">Strategy Notes</Label>
+                            <textarea
+                              className="w-full text-sm bg-secondary/50 border border-border rounded-lg p-2.5 text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+                              rows={3}
+                              placeholder="Add your approach notes, talking points, or reminders..."
+                              value={gtcNotesMap[target.id] ?? target.notes ?? ""}
+                              onChange={(e) => setGtcNotesMap((prev) => ({ ...prev, [target.id]: e.target.value }))}
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => updateNotesMutation.mutate({
+                                  targetId: target.id,
+                                  notes: gtcNotesMap[target.id] ?? target.notes ?? "",
+                                })}
+                                disabled={updateNotesMutation.isPending}
+                              >
+                                Save Notes
+                              </Button>
+                              {target.website && (
+                                <a href={target.website} target="_blank" rel="noopener noreferrer">
+                                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
+                                    <ExternalLink className="w-3 h-3" /> Website
+                                  </Button>
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
     </DashboardLayout>
   );

@@ -210,3 +210,29 @@ export const cardScans = mysqlTable("cardScans", {
 
 export type CardScan = typeof cardScans.$inferSelect;
 export type InsertCardScan = typeof cardScans.$inferInsert;
+
+// ─── GTC 2026 Strategy Targets ───────────────────────────────────────────────
+
+export const gtcTargets = mysqlTable("gtcTargets", {
+  id: int("id").autoincrement().primaryKey(),
+  companyName: varchar("companyName", { length: 255 }).notNull(),
+  contactName: varchar("contactName", { length: 255 }),
+  contactTitle: varchar("contactTitle", { length: 255 }),
+  type: mysqlEnum("type", ["Elite Sponsor", "Diamond Sponsor", "Platinum Sponsor", "Gold Sponsor", "Silver Sponsor", "Presenter", "Startup"]).notNull(),
+  description: text("description"),
+  gpuFitReason: text("gpuFitReason"),
+  // Why this company is a good Lektra prospect
+  priorityTier: mysqlEnum("priorityTier", ["Must Meet", "High Value", "Worth Visiting"]).notNull(),
+  priorityScore: int("priorityScore").default(0).notNull(),
+  // 0-100 score for sorting within tier
+  boothNumber: varchar("boothNumber", { length: 32 }),
+  website: varchar("website", { length: 512 }),
+  linkedinUrl: varchar("linkedinUrl", { length: 512 }),
+  addedToLeadsId: int("addedToLeadsId"),
+  // null = not yet added, set to leadId when added
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type GtcTarget = typeof gtcTargets.$inferSelect;
+export type InsertGtcTarget = typeof gtcTargets.$inferInsert;

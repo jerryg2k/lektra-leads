@@ -228,3 +228,17 @@
 - [x] Sequence generator: detect GTC-2026 tag and pre-fill intro context in LLM prompt
 - [x] PWA manifest.json with name, icons, start_url=/scan-card, display=standalone
 - [x] Link manifest in index.html for home screen install on Android/Galaxy Tab
+
+## GTC 2026 Strategy Tab (new request)
+- [x] Research GTC 2026 presenters, sponsors, exhibitors from public sources
+- [x] Backend: gtcTargets table (company, type: presenter/sponsor/exhibitor, description, gpuFit, priority, addedToLeads)
+- [x] Backend: gtc.targets procedure (list all targets with priority score)
+- [x] Backend: gtc.addToLeads procedure (add selected target as lead)
+- [x] Backend: gtc.updateNotes procedure (save strategy notes per target)
+- [x] Discover page: GTC Strategy tab with priority tiers (Must Meet / High Value / Worth Visiting)
+- [x] GTC Strategy tab: filter by tier (Must Meet / High Value / Worth Visiting / All)
+- [x] GTC Strategy tab: search by company/contact name
+- [x] GTC Strategy tab: add-to-pipeline button per target
+- [x] GTC Strategy tab: show already-in-pipeline badge
+- [x] GTC Strategy tab: expandable notes editor per target
+- [x] GTC Strategy tab: GPU fit reason shown per target
