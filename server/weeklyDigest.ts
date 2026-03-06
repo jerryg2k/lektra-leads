@@ -108,6 +108,27 @@ export async function sendWeeklyDigest(): Promise<{ sent: boolean; summary: stri
   lines.push(`📋 Total: **${allLeads.length}** leads in database`);
   lines.push("");
 
+  // Relationship Mix (lead type breakdown)
+  const typeCount: Record<string, number> = {};
+  for (const lead of allLeads) {
+    const type = (lead as any).leadType ?? "Prospect";
+    typeCount[type] = (typeCount[type] ?? 0) + 1;
+  }
+  const typeOrder = ["Prospect", "Partner", "Investor", "Other"];
+  const typeEmoji: Record<string, string> = { Prospect: "🎯", Partner: "🤝", Investor: "💼", Other: "📌" };
+  const hasNonProspect = typeOrder.some((t) => t !== "Prospect" && (typeCount[t] ?? 0) > 0);
+  if (hasNonProspect) {
+    lines.push("## 🤝 Relationship Mix");
+    for (const type of typeOrder) {
+      const count = typeCount[type] ?? 0;
+      if (count > 0) {
+        const pct = allLeads.length > 0 ? Math.round((count / allLeads.length) * 100) : 0;
+        lines.push(`${typeEmoji[type]} ${type}s: **${count}** (${pct}%)`);
+      }
+    }
+    lines.push("");
+  }
+
   // Recent activity
   lines.push("## 📝 Recent Activity (Last 7 Days)");
   if (recentNotes.length === 0) {

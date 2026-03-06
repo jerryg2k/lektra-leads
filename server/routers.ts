@@ -15,6 +15,7 @@ import {
   getLeads,
   getNotesByLeadId,
   getPipelineStats,
+  getLeadTypeStats,
   getUserSettings,
   updateContact,
   updateLead,
@@ -633,6 +634,7 @@ export const appRouter = router({
       }),
 
     pipelineStats: protectedProcedure.query(() => getPipelineStats()),
+    leadTypeStats: protectedProcedure.query(() => getLeadTypeStats()),
 
     sourceStats: protectedProcedure.query(async () => {
       const allLeads = await getLeads({});

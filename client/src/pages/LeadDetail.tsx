@@ -288,6 +288,15 @@ export default function LeadDetail() {
     },
   });
 
+  const updateLeadTypeMutation = trpc.leads.update.useMutation({
+    onSuccess: () => {
+      utils.leads.get.invalidate({ id });
+      utils.leads.list.invalidate();
+      toast.success("Lead type updated");
+    },
+    onError: (err) => toast.error("Failed to update lead type: " + err.message),
+  });
+
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -393,6 +402,24 @@ export default function LeadDetail() {
                     {PIPELINE_STAGES.map((s) => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+                {/* Lead Type */}
+                <Select
+                  value={(lead as any).leadType ?? "Prospect"}
+                  onValueChange={(type) =>
+                    updateLeadTypeMutation.mutate({ id, data: { leadType: type as any } })
+                  }
+                  disabled={updateLeadTypeMutation.isPending}
+                >
+                  <SelectTrigger className="w-40 bg-secondary border-border text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border">
+                    <SelectItem value="Prospect">Prospect</SelectItem>
+                    <SelectItem value="Partner">Partner</SelectItem>
+                    <SelectItem value="Investor">Investor</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
                   </SelectContent>
                 </Select>
                 <div className="flex gap-2 flex-wrap">

@@ -282,3 +282,10 @@
 - [x] Backend: leads.list procedure — support leadType filter param
 - [x] Pipeline Kanban: show LeadTypeBadge on each lead card
 - [x] HubSpot CSV export: include leadType column
+
+## Lead Type Detail Edit, Dashboard Stat & Digest Breakdown (new request)
+- [x] Lead Detail edit form: add Lead Type selector (Prospect / Partner / Investor / Other)
+- [x] Backend: leads.update procedure — accept leadType field
+- [x] Dashboard: "Relationship Mix" card showing Prospect/Partner/Investor/Other counts with % bars
+- [x] Backend: leads.leadTypeStats procedure returns counts grouped by leadType
+- [x] Weekly digest email: Relationship Mix section (shown when Partners/Investors exist)

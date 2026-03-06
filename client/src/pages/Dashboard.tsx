@@ -47,6 +47,7 @@ export default function Dashboard() {
   const { data: overdueLeads, isLoading: overdueLoading } = trpc.leads.overdueFollowUps.useQuery();
   const { data: sourceStats } = trpc.leads.sourceStats.useQuery();
   const { data: gtcStats } = trpc.scan.gtcStats.useQuery();
+  const { data: leadTypeStats } = trpc.leads.leadTypeStats.useQuery();
   const [bulkLaunchDone, setBulkLaunchDone] = useState<{ launched: number; skipped: number } | null>(null);
   const bulkLaunchMutation = trpc.sequences.bulkLaunchGtcSequences.useMutation({
     onSuccess: (result) => {
@@ -341,6 +342,44 @@ export default function Dashboard() {
           </Card>
         )}
 
+        {/* Relationship Mix */}
+        {leadTypeStats && leadTypeStats.length > 0 && (
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" />
+                Relationship Mix
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {(["Prospect", "Partner", "Investor", "Other"] as const).map((type) => {
+                  const stat = leadTypeStats.find((s) => (s.leadType ?? "Prospect") === type);
+                  const count = Number(stat?.count ?? 0);
+                  const total = leadTypeStats.reduce((sum, s) => sum + Number(s.count), 0);
+                  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                  const colorMap: Record<string, { bar: string; text: string; bg: string }> = {
+                    Prospect: { bar: "bg-sky-500", text: "text-sky-400", bg: "bg-sky-500/10" },
+                    Partner: { bar: "bg-violet-500", text: "text-violet-400", bg: "bg-violet-500/10" },
+                    Investor: { bar: "bg-amber-500", text: "text-amber-400", bg: "bg-amber-500/10" },
+                    Other: { bar: "bg-slate-500", text: "text-slate-400", bg: "bg-slate-500/10" },
+                  };
+                  const c = colorMap[type];
+                  return (
+                    <div key={type} className={`rounded-xl p-3 ${c.bg} border border-border`}>
+                      <p className={`text-2xl font-bold ${c.text}`}>{count}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{type}s</p>
+                      <div className="mt-2 h-1.5 bg-secondary rounded-full overflow-hidden">
+                        <div className={`h-full ${c.bar} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">{pct}% of total</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
         {/* Lead Source Analytics */}
         {sourceStats && sourceStats.length > 0 && (
           <Card className="bg-card border-border">

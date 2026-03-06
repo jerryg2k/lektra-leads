@@ -243,6 +243,18 @@ export async function getPipelineStats() {
     .groupBy(leads.pipelineStage);
 }
 
+export async function getLeadTypeStats() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      leadType: leads.leadType,
+      count: sql<number>`count(*)`,
+    })
+    .from(leads)
+    .where(eq(leads.isArchived, false))
+    .groupBy(leads.leadType);
+}
 // ─── User Settings ────────────────────────────────────────────────────────────
 
 export async function getUserSettings(userId: string) {
