@@ -385,6 +385,7 @@ export default function LeadsList() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Funding</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">GPU Fit</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Stage</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Source</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Data</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Score</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
@@ -423,6 +424,16 @@ export default function LeadsList() {
                       </td>
                       <td className="px-4 py-3">
                         <StageBadge stage={lead.pipelineStage ?? "New"} />
+                      </td>
+                      <td className="px-4 py-3">
+                        {lead.source ? (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            lead.source.includes("GTC") ? "bg-primary/15 text-primary" :
+                            lead.source === "Apollo Import" ? "bg-blue-500/15 text-blue-400" :
+                            lead.source === "auto-scan" ? "bg-purple-500/15 text-purple-400" :
+                            "bg-secondary text-muted-foreground"
+                          }`}>{lead.source}</span>
+                        ) : <span className="text-muted-foreground text-sm">—</span>}
                       </td>
                       <td className="px-4 py-3">
                         <CompletenessBar score={(lead as any).completenessScore ?? 0} />

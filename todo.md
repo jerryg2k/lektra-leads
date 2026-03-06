@@ -209,3 +209,14 @@
 - [x] NFC contact exchange: read NFC tag from another person's card and auto-fill lead form
 - [x] NFC page: sidebar nav item or button on Scan Card page
 - [x] NFC: graceful fallback for unsupported browsers (show QR code alternative)
+
+## GTC 2026 Conference Mode (new request)
+- [x] Service worker: cache Scan Card and NFC Exchange pages for offline use
+- [x] Service worker: queue card scans locally when offline, sync on reconnect
+- [x] Offline banner: show "Offline — scans queued" indicator when no network
+- [x] Batch scan session: "Start Session" button on Scan Card page
+- [x] Batch scan session: queue multiple scans, review all at end before saving
+- [x] Batch scan session: session summary (X cards scanned, X saved, X discarded)
+- [x] Lead source attribution: set source="GTC-2026 Card Scan" on card scan leads
+- [x] Lead source attribution: set source="GTC-2026 NFC" on NFC exchange leads
+- [x] Source field visible on Lead Detail and Leads list
