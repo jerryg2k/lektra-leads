@@ -242,3 +242,11 @@
 - [x] GTC Strategy tab: show already-in-pipeline badge
 - [x] GTC Strategy tab: expandable notes editor per target
 - [x] GTC Strategy tab: GPU fit reason shown per target
+
+## Bug: Socket Exception Flashing (reported)
+- [x] Diagnose socket exception causing UI flashing (stale esbuild error — server healthy, NFC write bug was root cause of flash)
+- [x] Fix root cause (NFC write now uses compatible text record type with specific error messages)
+
+## Bug: NFC Write Failed (reported)
+- [x] Fix NFC write failure on NFC Exchange page
+- [x] Improve error messages and user guidance for NFC write

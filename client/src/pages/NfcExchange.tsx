@@ -99,29 +99,50 @@ export default function NfcExchange() {
 
   const handleWriteNfc = async () => {
     if (!nfcSupported) {
-      toast.error("Web NFC is not supported on this browser. Use Chrome on Android.");
+      toast.error("Web NFC requires Chrome on Android. Use the QR code below instead.");
+      return;
+    }
+    if (!myName && !myCompany) {
+      toast.error("Please enter at least your name or company before writing.");
       return;
     }
     setMode("writing");
     abortRef.current = new AbortController();
     try {
       const ndef = new window.NDEFReader!();
+      // Request NFC permission first (required on some Android versions)
+      await ndef.scan({ signal: abortRef.current.signal }).catch(() => {});
+      abortRef.current = new AbortController();
       const vcard = buildVCard(myName, myTitle, myCompany, myEmail, myPhone, myWebsite);
+      // Use plain "text" record type — most compatible across all NFC tag types and Android versions
       await ndef.write(
-        { records: [{ recordType: "mime", mediaType: "text/vcard", data: new TextEncoder().encode(vcard) }] },
-        { signal: abortRef.current.signal }
+        { records: [{ recordType: "text", data: vcard }] },
+        { signal: abortRef.current.signal, overwrite: true }
       );
       setMode("success_write");
       toast.success("NFC tag written! Others can tap to receive your contact.");
     } catch (e: any) {
-      if (e.name !== "AbortError") toast.error("NFC write failed: " + e.message);
+      if (e.name === "AbortError") {
+        setMode("idle");
+        return;
+      }
+      // Provide specific guidance based on error type
+      if (e.name === "NotAllowedError") {
+        toast.error("NFC permission denied. Please allow NFC access in your browser settings.");
+      } else if (e.name === "NotSupportedError") {
+        toast.error("This NFC tag type is not writable. Try a different NTAG213/215/216 tag.");
+      } else if (e.name === "NetworkError") {
+        toast.error("No NFC tag detected. Hold the tag closer to the back of your phone.");
+      } else {
+        toast.error("NFC write failed: " + (e.message || "Unknown error. Ensure NFC is enabled in Android settings."));
+      }
       setMode("idle");
     }
   };
 
   const handleReadNfc = async () => {
     if (!nfcSupported) {
-      toast.error("Web NFC is not supported on this browser. Use Chrome on Android.");
+      toast.error("Web NFC requires Chrome on Android. Use the QR code below instead.");
       return;
     }
     setMode("reading");
@@ -131,7 +152,19 @@ export default function NfcExchange() {
       await ndef.scan({ signal: abortRef.current.signal });
       ndef.addEventListener("reading", ({ message }: any) => {
         for (const record of message.records) {
-          const text = new TextDecoder().decode(record.data);
+          let text = "";
+          try {
+            // Handle text records (may have language prefix byte)
+            if (record.recordType === "text") {
+              const data = new Uint8Array(record.data.buffer);
+              const langLen = data[0] & 0x3f;
+              text = new TextDecoder("utf-8").decode(data.slice(1 + langLen));
+            } else {
+              text = new TextDecoder().decode(record.data);
+            }
+          } catch {
+            text = new TextDecoder().decode(record.data);
+          }
           const parsed = parseVCard(text);
           if (parsed.name || parsed.company) {
             setReceivedCard(parsed);
@@ -139,7 +172,6 @@ export default function NfcExchange() {
             abortRef.current?.abort();
             return;
           }
-          // Try plain text URL or name
           if (text.trim()) {
             setReceivedCard({ name: text.trim() });
             setMode("success_read");
@@ -147,9 +179,23 @@ export default function NfcExchange() {
             return;
           }
         }
+        toast.error("No readable contact data found on this tag.");
+        setMode("idle");
+      });
+      ndef.addEventListener("readingerror", () => {
+        toast.error("Could not read NFC tag. Try holding it closer to the back of your phone.");
+        setMode("idle");
       });
     } catch (e: any) {
-      if (e.name !== "AbortError") toast.error("NFC read failed: " + e.message);
+      if (e.name === "AbortError") {
+        setMode("idle");
+        return;
+      }
+      if (e.name === "NotAllowedError") {
+        toast.error("NFC permission denied. Please allow NFC access in your browser settings.");
+      } else {
+        toast.error("NFC read failed: " + (e.message || "Ensure NFC is enabled in Android settings."));
+      }
       setMode("idle");
     }
   };
@@ -270,7 +316,8 @@ export default function NfcExchange() {
               <Loader2 className="absolute -top-1 -right-1 h-5 w-5 text-primary animate-spin" />
             </div>
             <p className="font-semibold text-foreground">Hold phone near NFC tag...</p>
-            <p className="text-sm text-muted-foreground">Writing your vCard contact</p>
+            <p className="text-sm text-muted-foreground">Touch the back of your phone to the NFC tag</p>
+            <p className="text-xs text-muted-foreground text-center max-w-xs">Tip: Use NTAG213, NTAG215, or NTAG216 tags. Keep the tag still until the write completes.</p>
             <Button variant="outline" size="sm" onClick={handleCancel} className="gap-2 mt-2">
               <X className="h-4 w-4" /> Cancel
             </Button>
