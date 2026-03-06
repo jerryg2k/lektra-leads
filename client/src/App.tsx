@@ -12,6 +12,7 @@ import Discover from "@/pages/Discover";
 import Import from "./pages/Import";
 import Settings from "./pages/Settings";
 import BusinessCardScanner from "./pages/BusinessCardScanner";
+import NfcExchange from "./pages/NfcExchange";
 
 function Router() {
   return (
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/import" component={Import} />
       <Route path="/settings" component={Settings} />
       <Route path="/scan-card" component={BusinessCardScanner} />
+      <Route path="/nfc" component={NfcExchange} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

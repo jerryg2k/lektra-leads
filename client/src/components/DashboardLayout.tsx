@@ -22,7 +22,7 @@ import {
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { trpc } from "@/lib/trpc";
-import { BarChart3, Building2, Kanban, LogOut, PanelLeft, Plus, ScanLine, Search, Settings, Upload } from "lucide-react";
+import { BarChart3, Building2, Kanban, LogOut, PanelLeft, Plus, Radio, ScanLine, Search, Settings, Upload } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -35,6 +35,7 @@ const menuItems = [
   { icon: Search, label: "Discover", path: "/discover" },
   { icon: Upload, label: "Import", path: "/import" },
   { icon: ScanLine, label: "Scan Card", path: "/scan-card" },
+  { icon: Radio, label: "NFC Exchange", path: "/nfc" },
   { icon: Settings, label: "Settings", path: "/settings" },
 ];
 

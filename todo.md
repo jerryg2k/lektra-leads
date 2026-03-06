@@ -199,3 +199,13 @@
 - [x] Business Card Scanner: pre-filled Add Lead form from extracted data with edit before save
 - [x] Business Card Scanner: sidebar nav item with camera icon
 - [x] Business Card Scanner: GTC 2026 event tag auto-applied to scanned leads
+
+## GTC 2026 Advanced Features (new request)
+- [x] GTC-2026 CSV export shortcut on Leads page (pre-filtered by GTC-2026 tag)
+- [x] Scan Card page: Recent Scans section showing last 10 cards (thumbnail + company + date)
+- [x] Backend: scanLog table to persist card scan results (imageUrl, company, contactName, leadId, scannedAt)
+- [x] After saving scanned card as lead, auto-trigger Discover enrichment (funding, headcount, description)
+- [x] NFC contact exchange page: write Lektra vCard to NFC tag for tap-to-share
+- [x] NFC contact exchange: read NFC tag from another person's card and auto-fill lead form
+- [x] NFC page: sidebar nav item or button on Scan Card page
+- [x] NFC: graceful fallback for unsupported browsers (show QR code alternative)

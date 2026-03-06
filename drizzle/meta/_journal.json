@@ -71,6 +71,13 @@
       "when": 1772756862863,
       "tag": "0009_round_white_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1772760535706,
+      "tag": "0010_cloudy_tarantula",
+      "breakpoints": true
     }
   ]
 }

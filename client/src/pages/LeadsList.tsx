@@ -76,6 +76,21 @@ export default function LeadsList() {
 
   const previewMutation = trpc.leads.exportHubspot.useMutation();
 
+  // GTC-2026 quick export
+  const gtcExportMutation = trpc.leads.exportHubspot.useMutation({
+    onSuccess: ({ csv, count }) => {
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `lektra-gtc2026-leads-${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${count} GTC-2026 leads`);
+    },
+    onError: () => toast.error("GTC export failed"),
+  });
+
   const bulkReEnrichMutation = trpc.leads.bulkReEnrich.useMutation({
     onSuccess: ({ total, enriched }) => {
       utils.leads.list.invalidate();
@@ -129,6 +144,17 @@ export default function LeadsList() {
                 ? <Loader2 className="h-4 w-4 animate-spin" />
                 : <Sparkles className="h-4 w-4" />}
               <span className="hidden md:inline">{bulkReEnrichMutation.isPending ? "Enriching..." : "Bulk Re-enrich"}</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-border border-primary/40 text-primary hover:bg-primary/10"
+              disabled={gtcExportMutation.isPending}
+              onClick={() => gtcExportMutation.mutate({ filters: { tags: "GTC-2026" } as any })}
+              title="Export all GTC-2026 tagged leads to CSV"
+            >
+              {gtcExportMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              <span className="hidden sm:inline">GTC Export</span>
             </Button>
             <Dialog open={exportOpen} onOpenChange={setExportOpen}>
               <DialogTrigger asChild>

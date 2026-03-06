@@ -31,7 +31,7 @@ import {
 import { discoverRouter } from "./routers/discover";
 import { invokeLLM } from "./_core/llm";
 import { getDb } from "./db";
-import { emailSequences, notes, scanHistory, leads } from "../drizzle/schema";
+import { emailSequences, notes, scanHistory, leads, cardScans } from "../drizzle/schema";
 import { sendWeeklyDigest } from "./weeklyDigest";
 import { runDailyScan } from "./dailyScan";
 import { eq, and, desc } from "drizzle-orm";
@@ -314,6 +314,47 @@ const cardScannerRouter = router({
         notes: extracted.notes ?? null,
         eventTag: input.eventTag,
       };
+    }),
+
+  // Log a completed card scan to the cardScans table
+  logScan: protectedProcedure
+    .input(z.object({
+      imageUrl: z.string().url().optional(),
+      company: z.string().optional(),
+      contactName: z.string().optional(),
+      contactTitle: z.string().optional(),
+      contactEmail: z.string().optional(),
+      leadId: z.number().optional(),
+      eventTag: z.string().optional().default("GTC-2026"),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.insert(cardScans).values({
+        imageUrl: input.imageUrl ?? null,
+        company: input.company ?? null,
+        contactName: input.contactName ?? null,
+        contactTitle: input.contactTitle ?? null,
+        contactEmail: input.contactEmail ?? null,
+        leadId: input.leadId ?? null,
+        eventTag: input.eventTag,
+        userId: ctx.user.id,
+      });
+      return { success: true };
+    }),
+
+  // Get recent card scans for this user
+  recentScans: protectedProcedure
+    .query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const rows = await db
+        .select()
+        .from(cardScans)
+        .where(eq(cardScans.userId, ctx.user.id))
+        .orderBy(desc(cardScans.scannedAt))
+        .limit(10);
+      return rows;
     }),
 });
 

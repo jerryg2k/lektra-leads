@@ -192,3 +192,21 @@ export const scanHistory = mysqlTable("scanHistory", {
 
 export type ScanHistory = typeof scanHistory.$inferSelect;
 export type InsertScanHistory = typeof scanHistory.$inferInsert;
+
+// ─── Card Scans (Business Card Scanner history) ─────────────────────────────────────────────────────
+
+export const cardScans = mysqlTable("cardScans", {
+  id: int("id").autoincrement().primaryKey(),
+  scannedAt: timestamp("scannedAt").defaultNow().notNull(),
+  imageUrl: text("imageUrl"),
+  company: varchar("company", { length: 255 }),
+  contactName: varchar("contactName", { length: 255 }),
+  contactTitle: varchar("contactTitle", { length: 255 }),
+  contactEmail: varchar("contactEmail", { length: 255 }),
+  leadId: int("leadId"),
+  eventTag: varchar("eventTag", { length: 100 }).default("GTC-2026"),
+  userId: int("userId"),
+});
+
+export type CardScan = typeof cardScans.$inferSelect;
+export type InsertCardScan = typeof cardScans.$inferInsert;
