@@ -47,6 +47,18 @@ export default function Dashboard() {
   const { data: overdueLeads, isLoading: overdueLoading } = trpc.leads.overdueFollowUps.useQuery();
   const { data: sourceStats } = trpc.leads.sourceStats.useQuery();
   const { data: gtcStats } = trpc.scan.gtcStats.useQuery();
+  const [bulkLaunchDone, setBulkLaunchDone] = useState<{ launched: number; skipped: number } | null>(null);
+  const bulkLaunchMutation = trpc.sequences.bulkLaunchGtcSequences.useMutation({
+    onSuccess: (result) => {
+      setBulkLaunchDone(result);
+      if (result.launched > 0) {
+        toast.success(`Launched sequences for ${result.launched} GTC lead${result.launched !== 1 ? "s" : ""}! Review drafts in each lead.`);
+      } else {
+        toast.info(`All ${result.skipped} GTC leads already have sequences.`);
+      }
+    },
+    onError: () => toast.error("Bulk launch failed. Please try again."),
+  });
 
   const sendDigestMutation = trpc.leads.sendDigest.useMutation({
     onSuccess: (result) => {
@@ -295,13 +307,35 @@ export default function Dashboard() {
                   <span className="text-sm font-bold text-yellow-400">{gtcStats.topLead.score}</span>
                 </div>
               )}
-              <div className="flex gap-2 mt-3">
+              <div className="flex gap-2 mt-3 flex-wrap">
                 <Button size="sm" variant="outline" className="flex-1 text-xs gap-1.5 h-7" onClick={() => setLocation("/batch-scan")}>
                   <Layers className="h-3 w-3" /> Batch Scan
                 </Button>
                 <Button size="sm" variant="outline" className="flex-1 text-xs gap-1.5 h-7" onClick={() => setLocation("/leads?source=GTC")}>
                   <Building2 className="h-3 w-3" /> View All
                 </Button>
+              </div>
+              <div className="mt-2">
+                {bulkLaunchDone && bulkLaunchDone.launched === 0 ? (
+                  <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+                    <Check className="h-3.5 w-3.5 shrink-0" />
+                    All GTC leads have sequences — nothing new to launch.
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    className="w-full gap-1.5 text-xs h-8 bg-primary/90 hover:bg-primary"
+                    onClick={() => { setBulkLaunchDone(null); bulkLaunchMutation.mutate(); }}
+                    disabled={bulkLaunchMutation.isPending}
+                    title="Generate Day 1 intro emails for all GTC leads that don't have a sequence yet"
+                  >
+                    {bulkLaunchMutation.isPending ? (
+                      <><Loader2 className="h-3 w-3 animate-spin" /> Generating sequences...</>
+                    ) : (
+                      <><Mail className="h-3 w-3" /> Launch GTC Sequences</>
+                    )}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

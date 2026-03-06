@@ -16,7 +16,8 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import QRCode from "qrcode";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
@@ -209,6 +210,43 @@ export default function BusinessCardScanner() {
         isPrimary: true,
       }] : undefined,
     } as any);
+  };
+
+  // QR code generation for My Card
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const settingsQuery = trpc.settings.get.useQuery();
+  const settings = settingsQuery.data;
+
+  useEffect(() => {
+    const name = settings?.cardName;
+    const phone = settings?.cardPhone;
+    const email = settings?.cardEmail;
+    const company = settings?.cardCompany;
+    const title = settings?.cardTitle;
+    const website = settings?.cardWebsite;
+    if (!name && !email && !company) return;
+    const vcard = [
+      "BEGIN:VCARD",
+      "VERSION:3.0",
+      name ? `FN:${name}` : "",
+      title ? `TITLE:${title}` : "",
+      company ? `ORG:${company}` : "",
+      email ? `EMAIL:${email}` : "",
+      phone ? `TEL:${phone}` : "",
+      website ? `URL:${website}` : "",
+      "END:VCARD",
+    ].filter(Boolean).join("\n");
+    QRCode.toDataURL(vcard, { width: 300, margin: 2, color: { dark: "#000000", light: "#ffffff" } })
+      .then(setQrDataUrl)
+      .catch(() => {});
+  }, [settings?.cardName, settings?.cardEmail, settings?.cardCompany, settings?.cardTitle, settings?.cardPhone, settings?.cardWebsite, settings?.cardWebsite]);
+
+  const handleDownloadQr = () => {
+    if (!qrDataUrl) return;
+    const a = document.createElement("a");
+    a.href = qrDataUrl;
+    a.download = "lektra-contact-qr.png";
+    a.click();
   };
 
   const handleReset = () => {
@@ -441,6 +479,28 @@ export default function BusinessCardScanner() {
           <div className="flex flex-col items-center justify-center py-16 space-y-4">
             <Loader2 className="h-10 w-10 text-primary animate-spin" />
             <p className="text-sm text-muted-foreground">Creating lead and enriching with web data...</p>
+          </div>
+        )}
+
+        {/* My Card QR Code */}
+        {step === "capture" && qrDataUrl && (
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">My Contact QR Code</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Let others scan this to capture your contact</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={handleDownloadQr} className="gap-1.5 text-xs">
+                <Upload className="h-3.5 w-3.5" />
+                Download PNG
+              </Button>
+            </div>
+            <div className="flex justify-center">
+              <img src={qrDataUrl} alt="My contact QR code" className="w-40 h-40 rounded-xl border border-border" />
+            </div>
+            {!settings?.cardName && !settings?.cardEmail && (
+              <p className="text-xs text-muted-foreground text-center">Add your details in <strong>Settings</strong> to personalise this QR code.</p>
+            )}
           </div>
         )}
 

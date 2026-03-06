@@ -1584,6 +1584,104 @@ Return JSON with exactly: { "subject": "...", "body": "..." }${gtcContext}`;
         await db.delete(emailSequences).where(eq(emailSequences.leadId, input.leadId));
         return { success: true };
       }),
+    bulkLaunchGtcSequences: protectedProcedure
+      .mutation(async () => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { like, or, notInArray } = await import("drizzle-orm");
+        // Find all GTC leads
+        const gtcLeads = await db
+          .select()
+          .from(leads)
+          .where(or(
+            like(leads.source, "%GTC%"),
+            like(leads.tags, "%GTC-2026%"),
+          ));
+        if (gtcLeads.length === 0) return { launched: 0, skipped: 0, leadIds: [] };
+        // Find which leads already have sequences
+        const existingSeqs = await db
+          .select({ leadId: emailSequences.leadId })
+          .from(emailSequences)
+          .where(notInArray(emailSequences.leadId, [0])); // fetch all
+        const leadsWithSeqs = new Set(existingSeqs.map((s) => s.leadId));
+        // Only launch for leads without existing sequences
+        const targets = gtcLeads.filter((l) => !leadsWithSeqs.has(l.id));
+        if (targets.length === 0) return { launched: 0, skipped: gtcLeads.length, leadIds: [] };
+        const launched: number[] = [];
+        for (const lead of targets) {
+          try {
+            const gtcContext = `\n\nIMPORTANT: You met this person at NVIDIA GTC 2026 in San Jose. For the Day 1 email, open with a brief reference to meeting them at GTC — e.g. "Great connecting at GTC last week" or "Enjoyed our chat at GTC". Keep it natural and brief (one sentence max). For follow-ups, you don't need to mention GTC again.`;
+            const steps = [
+              { stepNumber: 1, dayOffset: 1, label: "Initial outreach" },
+              { stepNumber: 2, dayOffset: 4, label: "Follow-up #1" },
+              { stepNumber: 3, dayOffset: 10, label: "Follow-up #2 / value add" },
+            ];
+            for (const step of steps) {
+              const prompt = `You are Jerry Gutierrez, VP of Business Development at Lektra Cloud. Write a ${step.label} email to the founder/decision-maker at ${lead.companyName}.
+Lektra Cloud value proposition:
+- 30-50% cheaper than AWS/Azure/GCP on GPU compute (H200, RTX Pro 6000, B200 coming soon)
+- Solar-powered edge datacenters at commercial/industrial power sources — no land acquisition, no building permits
+- Lower latency, faster deployments, zero egress fees
+- Ideal for AI inference, model training, remote visualization, edge compute
+Company context:
+- Company: ${lead.companyName}
+- Industry: ${lead.industry ?? "AI/ML"}
+- GPU use cases: ${Array.isArray(lead.gpuUseCases) ? lead.gpuUseCases.join(", ") : "AI workloads"}
+- Funding stage: ${lead.fundingStage ?? "Unknown"}
+- Why they fit Lektra: ${lead.lektraFitReason ?? "Strong GPU spend signals"}
+Step: ${step.label} (Day ${step.dayOffset} of a 3-email sequence)
+Jerry's writing style rules:
+- Start with "Hi [FirstName]," or "Hi there," if no contact name
+- Maximum 3 short paragraphs, each 1-2 sentences
+- Be direct, warm, and conversational — never corporate
+- Reference something specific about their company or GPU use case
+- One clear CTA: ask for a 15-minute call
+- Sign off: "Best, Jerry"
+- For follow-ups: acknowledge it's a follow-up briefly, add new value or angle
+- Never use buzzwords like "synergy", "leverage", "circle back"
+Return JSON with exactly: { "subject": "...", "body": "..." }${gtcContext}`;
+              const response = await invokeLLM({
+                messages: [{ role: "user", content: prompt }],
+                response_format: {
+                  type: "json_schema",
+                  json_schema: {
+                    name: "email_draft",
+                    strict: true,
+                    schema: {
+                      type: "object",
+                      properties: {
+                        subject: { type: "string" },
+                        body: { type: "string" },
+                      },
+                      required: ["subject", "body"],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+              });
+              const content = response.choices[0]?.message?.content;
+              const parsed = JSON.parse(typeof content === "string" ? content : JSON.stringify(content));
+              const scheduledAt = new Date(Date.now() + step.dayOffset * 86400000);
+              await db.insert(emailSequences).values({
+                leadId: lead.id,
+                contactId: null,
+                contactName: null,
+                contactEmail: null,
+                stepNumber: step.stepNumber,
+                dayOffset: step.dayOffset,
+                subject: parsed.subject,
+                body: parsed.body,
+                status: "Draft",
+                scheduledAt,
+              });
+            }
+            launched.push(lead.id);
+          } catch (e) {
+            // Skip this lead if generation fails
+          }
+        }
+        return { launched: launched.length, skipped: gtcLeads.length - launched.length, leadIds: launched };
+      }),
   }),
 
   // ─── Notes ──────────────────────────────────────────────────────────────────

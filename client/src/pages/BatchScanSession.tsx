@@ -106,7 +106,13 @@ export default function BatchScanSession() {
         status: "pending",
       };
       setCards((prev) => [card, ...prev]);
-      toast.success(`Card ${cards.length + 1} scanned: ${card.company || card.contactName || "Unknown"}`);
+      toast.success(`Card ${cards.length + 1} scanned: ${card.company || card.contactName || "Unknown"} — tap Scan Another to continue`, {
+        action: {
+          label: "Scan Another",
+          onClick: () => handleStartCamera(),
+        },
+        duration: 6000,
+      });
     } catch (e: any) {
       toast.error("Scan failed: " + e.message);
     } finally {
@@ -352,19 +358,27 @@ export default function BatchScanSession() {
 
             {/* Session stats bar */}
             {cards.length > 0 && (
-              <div className="flex items-center gap-4 bg-card border border-border rounded-xl px-4 py-2.5 text-sm">
-                <span className="text-muted-foreground">{cards.length} scanned</span>
-                <span className="text-emerald-400">{savedCount} saved</span>
-                <span className="text-yellow-400">{pendingCount} pending</span>
-                {discardedCount > 0 && <span className="text-muted-foreground">{discardedCount} discarded</span>}
-                <div className="ml-auto flex gap-2">
+              <div className="flex flex-col gap-2 bg-card border border-border rounded-xl px-4 py-2.5 text-sm">
+                <div className="flex items-center gap-4">
+                  <span className="text-muted-foreground">{cards.length} scanned</span>
+                  <span className="text-emerald-400">{savedCount} saved</span>
+                  <span className="text-yellow-400">{pendingCount} pending</span>
+                  {discardedCount > 0 && <span className="text-muted-foreground">{discardedCount} discarded</span>}
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  {!cameraActive && !scanning && (
+                    <Button size="sm" onClick={handleStartCamera} className="gap-1.5 text-xs h-7 bg-primary/90 hover:bg-primary">
+                      <Camera className="h-3 w-3" />
+                      Scan Another
+                    </Button>
+                  )}
                   {pendingCount > 0 && (
                     <Button size="sm" onClick={handleSaveAll} className="gap-1.5 text-xs h-7">
                       <Check className="h-3 w-3" />
                       Save All ({pendingCount})
                     </Button>
                   )}
-                  <Button size="sm" variant="outline" onClick={() => setSessionDone(true)} className="gap-1.5 text-xs h-7">
+                  <Button size="sm" variant="outline" onClick={() => setSessionDone(true)} className="gap-1.5 text-xs h-7 ml-auto">
                     End Session
                     <ChevronRight className="h-3 w-3" />
                   </Button>

@@ -260,3 +260,8 @@
 - [x] Remove NfcExchange.tsx page file
 - [x] Remove NFC route from App.tsx
 - [x] Remove NFC nav item from DashboardLayout.tsx
+
+## GTC 2026 Final Polish (new request)
+- [x] QR code download button on Scan Card page (saves PNG to device)
+- [x] Batch Scan: "Scan Another" shortcut after each scan to immediately reopen camera
+- [x] Dashboard GTC widget: bulk "Start sequences for all uncontacted GTC leads" button
