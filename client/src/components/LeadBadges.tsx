@@ -113,6 +113,32 @@ export function GpuUseCaseTag({ useCase, className }: { useCase: string; classNa
   );
 }
 
+// ─── Lead Type Badge ─────────────────────────────────────────────────────────
+
+export function getLeadTypeBadgeClass(type: string): string {
+  switch (type) {
+    case "Partner": return "bg-violet-500/20 text-violet-400 border border-violet-500/30";
+    case "Investor": return "bg-amber-500/20 text-amber-400 border border-amber-500/30";
+    case "Other": return "bg-slate-500/20 text-slate-400 border border-slate-500/30";
+    default: return "bg-sky-500/20 text-sky-400 border border-sky-500/30"; // Prospect
+  }
+}
+
+export function LeadTypeBadge({ type, className }: { type?: string | null; className?: string }) {
+  if (!type || type === "Prospect") return null;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+        getLeadTypeBadgeClass(type),
+        className
+      )}
+    >
+      {type}
+    </span>
+  );
+}
+
 // ─── GPU Recommendation Badge ─────────────────────────────────────────────────
 
 export function GpuRecommendBadge({ gpu, className }: { gpu: string; className?: string }) {

@@ -1,0 +1,1 @@
+ALTER TABLE `leads` ADD `leadType` enum('Prospect','Partner','Investor','Other') DEFAULT 'Prospect';

@@ -69,9 +69,10 @@ export const leads = mysqlTable("leads", {
   followUpAt: timestamp("followUpAt"),
   followUpNote: varchar("followUpNote", { length: 512 }),
 
+  // Lead type
+  leadType: mysqlEnum("leadType", ["Prospect", "Partner", "Investor", "Other"]).default("Prospect"),
   // Tags (free-form labels for segmentation)
   tags: json("tags").$type<string[]>(),
-
   // Meta
   source: varchar("source", { length: 128 }),
   // e.g. "Apollo Import", "Manual", "LinkedIn"

@@ -57,6 +57,7 @@ export default function BusinessCardScanner() {
   const [linkedin, setLinkedin] = useState("");
   const [locationVal, setLocationVal] = useState("");
   const [notes, setNotes] = useState("");
+  const [leadType, setLeadType] = useState<"Prospect" | "Partner" | "Investor" | "Other">("Prospect");
 
   // tRPC utils for invalidation
   const utils = trpc.useUtils();
@@ -200,6 +201,7 @@ export default function BusinessCardScanner() {
       website: website || undefined,
       linkedinUrl: linkedin || undefined,
       location: locationVal || undefined,
+      leadType,
       tags: ["GTC-2026"],
       contacts: contactName ? [{
         name: contactName,
@@ -450,10 +452,30 @@ export default function BusinessCardScanner() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Additional Notes</Label>
-                <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any other info from the card..." className="bg-secondary border-border resize-none" rows={2} />
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-xs text-muted-foreground">Lead Type</Label>
+                <div className="flex gap-2 flex-wrap">
+                  {(["Prospect", "Partner", "Investor", "Other"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setLeadType(t)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        leadType === t
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-secondary text-muted-foreground border-border hover:border-primary/50"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Additional Notes</Label>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any other info from the card..." className="bg-secondary border-border resize-none" rows={2} />
             </div>
 
             {/* Action buttons */}

@@ -388,6 +388,8 @@ export default function Discover() {
   const [enrichingSet, setEnrichingSet] = useState<Set<string>>(new Set());
   const [addedSet, setAddedSet] = useState<Set<string>>(new Set());
   const [batchEnriching, setBatchEnriching] = useState(false);
+  const [discoverLeadType, setDiscoverLeadType] = useState<"Prospect" | "Partner" | "Investor" | "Other">("Prospect");
+  const [gtcLeadType, setGtcLeadType] = useState<"Prospect" | "Partner" | "Investor" | "Other">("Prospect");
 
   // Fetch filter options
   const { data: filterOpts } = trpc.discover.filterOptions.useQuery();
@@ -506,6 +508,7 @@ export default function Discover() {
         gpuUseCases: company.gpuUseCases,
         techStack: company.techStack,
         pipelineStage: "New",
+        leadType: discoverLeadType,
         source: "Discover Engine",
         assignedTo: user?.name ?? undefined,
       });
@@ -789,6 +792,25 @@ export default function Discover() {
           </CardContent>
         </Card>
 
+        {/* Lead type selector for adding leads */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs text-muted-foreground font-medium">Add as:</span>
+          {(["Prospect", "Partner", "Investor", "Other"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setDiscoverLeadType(t)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                discoverLeadType === t
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-secondary text-muted-foreground border-border hover:border-primary/50"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+
         {/* Enriched results */}
         {sortedEnriched.length > 0 && (
           <div className="space-y-3">
@@ -912,6 +934,25 @@ export default function Discover() {
               </div>
             </div>
 
+            {/* Lead type selector for GTC adds */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-xs text-muted-foreground font-medium">Add as:</span>
+              {(["Prospect", "Partner", "Investor", "Other"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setGtcLeadType(t)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                    gtcLeadType === t
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-secondary text-muted-foreground border-border hover:border-primary/50"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
@@ -984,7 +1025,7 @@ export default function Discover() {
                                 size="sm"
                                 variant="outline"
                                 className="h-7 text-xs gap-1"
-                                onClick={() => addToPipelineMutation.mutate({ targetId: target.id })}
+                                onClick={() => addToPipelineMutation.mutate({ targetId: target.id, leadType: gtcLeadType })}
                                 disabled={addToPipelineMutation.isPending}
                               >
                                 <BookmarkPlus className="w-3.5 h-3.5" />

@@ -1,5 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { FundingBadge, GpuRecommendBadge, GpuUseCaseTag, ScoreBadge, StageBadge } from "@/components/LeadBadges";
+import { FundingBadge, GpuRecommendBadge, GpuUseCaseTag, LeadTypeBadge, ScoreBadge, StageBadge } from "@/components/LeadBadges";
 import { CompletenessBar } from "@/pages/LeadsList";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -345,6 +345,7 @@ export default function LeadDetail() {
                 <div className="flex items-center gap-3 flex-wrap">
                   <h1 className="text-xl font-bold text-foreground">{lead.companyName}</h1>
                   <ScoreBadge score={lead.score ?? 0} />
+                  <LeadTypeBadge type={(lead as any).leadType} />
                   <GpuRecommendBadge gpu={lead.recommendedGpu ?? "TBD"} />
                 </div>
                 <div className="flex items-center gap-3 mt-1.5 flex-wrap">

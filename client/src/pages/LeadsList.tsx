@@ -1,5 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { FundingBadge, GpuRecommendBadge, ScoreBadge, StageBadge } from "@/components/LeadBadges";
+import { FundingBadge, GpuRecommendBadge, LeadTypeBadge, ScoreBadge, StageBadge } from "@/components/LeadBadges";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -423,7 +423,10 @@ export default function LeadsList() {
                         <GpuRecommendBadge gpu={lead.recommendedGpu ?? "TBD"} />
                       </td>
                       <td className="px-4 py-3">
-                        <StageBadge stage={lead.pipelineStage ?? "New"} />
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <StageBadge stage={lead.pipelineStage ?? "New"} />
+                          <LeadTypeBadge type={(lead as any).leadType} />
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         {lead.source ? (
@@ -477,6 +480,7 @@ export default function LeadsList() {
                       <FundingBadge stage={lead.fundingStage} />
                     )}
                     <StageBadge stage={lead.pipelineStage ?? "New"} />
+                    <LeadTypeBadge type={(lead as any).leadType} />
                     <GpuRecommendBadge gpu={lead.recommendedGpu ?? "TBD"} />
                   </div>
                   <div className="mt-2">

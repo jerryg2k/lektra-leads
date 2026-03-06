@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE `leads` ADD COLUMN `leadType` ENUM('Prospect', 'Partner', 'Investor', 'Other') NOT NULL DEFAULT 'Prospect';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3yZWWDdWgJ6wn7A.root --database VqzMxkU43xUnkTv8sssN4T --execute ALTER TABLE `leads` ADD COLUMN `leadType` ENUM('Prospect', 'Partner', 'Investor', 'Other') NOT NULL DEFAULT 'Prospect';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1007
+}

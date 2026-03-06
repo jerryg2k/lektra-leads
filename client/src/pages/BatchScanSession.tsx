@@ -36,6 +36,7 @@ type ScannedCard = {
   linkedin: string;
   locationVal: string;
   notes: string;
+  leadType: "Prospect" | "Partner" | "Investor" | "Other";
   status: "pending" | "saving" | "saved" | "discarded";
   leadId?: number;
 };
@@ -103,6 +104,7 @@ export default function BatchScanSession() {
         linkedin: result.linkedin ?? "",
         locationVal: result.location ?? "",
         notes: result.notes ?? "",
+        leadType: "Prospect",
         status: "pending",
       };
       setCards((prev) => [card, ...prev]);
@@ -182,6 +184,7 @@ export default function BatchScanSession() {
         website: card.website || undefined,
         linkedinUrl: card.linkedin || undefined,
         location: card.locationVal || undefined,
+        leadType: card.leadType,
         tags: ["GTC-2026"],
         source: "GTC-2026 Card Scan",
         contacts: card.contactName ? [{
@@ -459,6 +462,25 @@ export default function BatchScanSession() {
                         />
                       </div>
                     ))}
+                    <div className="col-span-2 space-y-1">
+                      <Label className="text-xs text-muted-foreground">Lead Type</Label>
+                      <div className="flex gap-2 flex-wrap">
+                        {(["Prospect", "Partner", "Investor", "Other"] as const).map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => updateCard(card.id, { leadType: t })}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                              card.leadType === t
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-card text-muted-foreground border-border hover:border-primary/50"
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="col-span-2 space-y-1">
                       <Label className="text-xs text-muted-foreground">Notes</Label>
                       <Textarea

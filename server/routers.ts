@@ -71,6 +71,9 @@ const LeadCreateSchema = z.object({
   pipelineStage: z
     .enum(["New", "Contacted", "Qualified", "Closed Won", "Closed Lost"])
     .optional(),
+  leadType: z
+    .enum(["Prospect", "Partner", "Investor", "Other"])
+    .optional(),
   source: z.string().optional(),
   assignedTo: z.string().optional(),
 });
@@ -454,7 +457,10 @@ export const appRouter = router({
       }),
 
     addToPipeline: protectedProcedure
-      .input(z.object({ targetId: z.number() }))
+      .input(z.object({
+        targetId: z.number(),
+        leadType: z.enum(["Prospect", "Partner", "Investor", "Other"]).optional(),
+      }))
       .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -478,6 +484,7 @@ export const appRouter = router({
           scoreBreakdown: breakdown,
           lektraFitReason: fitReason,
           recommendedGpu: recommendedGpu as any,
+          leadType: input.leadType ?? "Prospect",
           assignedTo: ctx.user.name ?? undefined,
         } as any);
         const leadId = (newLead as any)?.insertId;

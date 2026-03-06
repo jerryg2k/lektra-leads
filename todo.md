@@ -265,3 +265,14 @@
 - [x] QR code download button on Scan Card page (saves PNG to device)
 - [x] Batch Scan: "Scan Another" shortcut after each scan to immediately reopen camera
 - [x] Dashboard GTC widget: bulk "Start sequences for all uncontacted GTC leads" button
+
+## Lead Type: Partner Option (new request)
+- [x] Add leadType enum field to leads schema (Prospect, Partner, Investor, Other)
+- [x] Run DB migration (pnpm db:push)
+- [x] Add leadType to LeadCreateSchema and leads.update input in routers.ts
+- [x] Business Card Scanner: add lead type selector (Prospect / Partner / Investor / Other) before saving
+- [x] Batch Scan Session: add lead type selector per card in review queue
+- [x] Discovery search: add lead type selector in the "Add to Leads" confirmation
+- [x] GTC Strategy addToPipeline: pass leadType through (default Prospect)
+- [x] Lead Detail page: show lead type badge in header
+- [x] Leads list: show lead type badge on cards/rows
