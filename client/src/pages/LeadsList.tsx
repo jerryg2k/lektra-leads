@@ -39,6 +39,7 @@ export default function LeadsList() {
   const [industry, setIndustry] = useState<string | undefined>();
   const [fundingStage, setFundingStage] = useState<string | undefined>();
   const [pipelineStage, setPipelineStage] = useState<string | undefined>();
+  const [leadType, setLeadType] = useState<string | undefined>();
   const [minScore, setMinScore] = useState<number | undefined>();
   const [showFilters, setShowFilters] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -48,6 +49,7 @@ export default function LeadsList() {
     industry: industry || undefined,
     fundingStage: fundingStage || undefined,
     pipelineStage: pipelineStage || undefined,
+    leadType: leadType || undefined,
     minScore,
     isArchived: false,
   };
@@ -107,12 +109,13 @@ export default function LeadsList() {
   ) ?? [];
   const displayedLeads = pendingReviewMode ? autoScanLeads : leads ?? [];
 
-  const hasActiveFilters = !!(industry || fundingStage || pipelineStage || minScore !== undefined);
+  const hasActiveFilters = !!(industry || fundingStage || pipelineStage || leadType || minScore !== undefined);
 
   const clearFilters = () => {
     setIndustry(undefined);
     setFundingStage(undefined);
     setPipelineStage(undefined);
+    setLeadType(undefined);
     setMinScore(undefined);
   };
 
@@ -289,8 +292,8 @@ export default function LeadsList() {
             <Filter className="h-4 w-4" />
             Filters
             {hasActiveFilters && (
-              <span className="bg-primary text-primary-foreground rounded-full text-[10px] px-1.5 py-0.5 font-bold">
-                {[industry, fundingStage, pipelineStage, minScore !== undefined ? 1 : 0].filter(Boolean).length}
+              <span className="bg-primary text-primary-foreground rounded-full text-[10px] font-bold w-4 h-4 flex items-center justify-center">
+                {[industry, fundingStage, pipelineStage, leadType, minScore !== undefined ? 1 : 0].filter(Boolean).length}
               </span>
             )}
           </Button>
@@ -337,6 +340,21 @@ export default function LeadsList() {
                 <SelectContent className="bg-popover border-border">
                   <SelectItem value="all">All pipeline</SelectItem>
                   {PIPELINE_STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1.5 block">Lead Type</Label>
+              <Select value={leadType ?? "all"} onValueChange={(v) => setLeadType(v === "all" ? undefined : v)}>
+                <SelectTrigger className="bg-secondary border-border text-sm h-9">
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border">
+                  <SelectItem value="all">All types</SelectItem>
+                  <SelectItem value="Prospect">Prospect</SelectItem>
+                  <SelectItem value="Partner">Partner</SelectItem>
+                  <SelectItem value="Investor">Investor</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>

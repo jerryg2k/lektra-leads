@@ -1,5 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { FundingBadge, GpuRecommendBadge, ScoreBadge, StageBadge } from "@/components/LeadBadges";
+import { FundingBadge, GpuRecommendBadge, LeadTypeBadge, ScoreBadge, StageBadge } from "@/components/LeadBadges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/lib/trpc";
@@ -110,6 +110,7 @@ export default function Pipeline() {
                             {lead.fundingStage && lead.fundingStage !== "Unknown" && (
                               <FundingBadge stage={lead.fundingStage} />
                             )}
+                            <LeadTypeBadge type={(lead as any).leadType} />
                             <GpuRecommendBadge gpu={lead.recommendedGpu ?? "TBD"} />
                           </div>
 

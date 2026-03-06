@@ -88,6 +88,7 @@ export type LeadFilters = {
   fundingStage?: string;
   location?: string;
   pipelineStage?: string;
+  leadType?: string;
   minScore?: number;
   maxScore?: number;
   isArchived?: boolean;
@@ -114,6 +115,7 @@ export async function getLeads(filters: LeadFilters = {}) {
   if (filters.fundingStage) conditions.push(eq(leads.fundingStage, filters.fundingStage as any));
   if (filters.location) conditions.push(like(leads.location, `%${filters.location}%`));
   if (filters.pipelineStage) conditions.push(eq(leads.pipelineStage, filters.pipelineStage as any));
+  if (filters.leadType) conditions.push(eq(leads.leadType, filters.leadType as any));
   if (filters.minScore !== undefined) conditions.push(sql`${leads.score} >= ${filters.minScore}`);
   if (filters.maxScore !== undefined) conditions.push(sql`${leads.score} <= ${filters.maxScore}`);
 

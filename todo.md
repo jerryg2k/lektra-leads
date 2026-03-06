@@ -276,3 +276,9 @@
 - [x] GTC Strategy addToPipeline: pass leadType through (default Prospect)
 - [x] Lead Detail page: show lead type badge in header
 - [x] Leads list: show lead type badge on cards/rows
+
+## Lead Type Filter, Pipeline Badge & CSV Export (new request)
+- [x] Leads page: Lead Type filter dropdown (All / Prospect / Partner / Investor / Other)
+- [x] Backend: leads.list procedure — support leadType filter param
+- [x] Pipeline Kanban: show LeadTypeBadge on each lead card
+- [x] HubSpot CSV export: include leadType column
