@@ -296,3 +296,9 @@
 - [x] Backend: gtc.addToPipeline — pass per-card leadType through
 - [x] Leads page: "Download CSV" button exporting company, stage, score, lead type, follow-up date, last note, tags
 - [x] Backend: leads.exportCsv procedure returning full CSV string
+
+## Mobile Header UX — Leads Page (new request)
+- [x] Collapse secondary action buttons (Bulk Re-enrich, Download CSV, GTC Export, Export HubSpot) into a labelled "Actions" overflow menu on mobile
+- [x] Keep "Add Lead" as the primary CTA always visible on mobile
+- [x] Ensure each menu item has an icon + clear text label
+- [x] Preserve full button row on desktop (sm: and above)

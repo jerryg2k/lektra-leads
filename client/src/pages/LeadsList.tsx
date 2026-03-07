@@ -2,13 +2,14 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { FundingBadge, GpuRecommendBadge, LeadTypeBadge, ScoreBadge, StageBadge } from "@/components/LeadBadges";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { Bell, Building2, Check, ChevronDown, Download, Filter, Loader2, Phone, Plus, ScanLine, Search, Sparkles, X } from "lucide-react";
+import { Bell, Building2, Check, ChevronDown, Download, Filter, Loader2, MoreHorizontal, Phone, Plus, ScanLine, Search, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -145,50 +146,102 @@ export default function LeadsList() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 border-border"
-              onClick={() => {
-                if (confirm(`Re-enrich all leads with completeness < 7? This may take a minute.`)) {
-                  bulkReEnrichMutation.mutate({ minCompleteness: 7 });
-                }
-              }}
-              disabled={bulkReEnrichMutation.isPending}
-              title="Re-enrich all leads with data completeness below 7/10"
-            >
-              {bulkReEnrichMutation.isPending
-                ? <Loader2 className="h-4 w-4 animate-spin" />
-                : <Sparkles className="h-4 w-4" />}
-              <span className="hidden md:inline">{bulkReEnrichMutation.isPending ? "Enriching..." : "Bulk Re-enrich"}</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 border-border"
-              disabled={exportCsvMutation.isPending}
-              onClick={() => exportCsvMutation.mutate({ filters })}
-              title="Download all visible leads as CSV (respects active filters)"
-            >
-              {exportCsvMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              <span className="hidden sm:inline">Download CSV</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 border-border border-primary/40 text-primary hover:bg-primary/10"
-              disabled={gtcExportMutation.isPending}
-              onClick={() => gtcExportMutation.mutate({ filters: { tags: "GTC-2026" } as any })}
-              title="Export all GTC-2026 tagged leads to CSV"
-            >
-              {gtcExportMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              <span className="hidden sm:inline">GTC Export</span>
-            </Button>
+            {/* ── Desktop: full button row ── */}
+            <div className="hidden sm:flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-border"
+                onClick={() => {
+                  if (confirm(`Re-enrich all leads with completeness < 7? This may take a minute.`)) {
+                    bulkReEnrichMutation.mutate({ minCompleteness: 7 });
+                  }
+                }}
+                disabled={bulkReEnrichMutation.isPending}
+                title="Re-enrich all leads with data completeness below 7/10"
+              >
+                {bulkReEnrichMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                <span className="hidden md:inline">{bulkReEnrichMutation.isPending ? "Enriching..." : "Bulk Re-enrich"}</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-border"
+                disabled={exportCsvMutation.isPending}
+                onClick={() => exportCsvMutation.mutate({ filters })}
+                title="Download all visible leads as CSV (respects active filters)"
+              >
+                {exportCsvMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Download CSV
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-border border-primary/40 text-primary hover:bg-primary/10"
+                disabled={gtcExportMutation.isPending}
+                onClick={() => gtcExportMutation.mutate({ filters: { tags: "GTC-2026" } as any })}
+                title="Export all GTC-2026 tagged leads to CSV"
+              >
+                {gtcExportMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                GTC Export
+              </Button>
+            </div>
+
+            {/* ── Mobile: Actions overflow menu ── */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 sm:hidden">
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="text-xs font-medium">Actions</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52 bg-card border-border">
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Manage Leads</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (confirm(`Re-enrich all leads with completeness < 7? This may take a minute.`)) {
+                      bulkReEnrichMutation.mutate({ minCompleteness: 7 });
+                    }
+                  }}
+                  disabled={bulkReEnrichMutation.isPending}
+                  className="gap-2 cursor-pointer"
+                >
+                  {bulkReEnrichMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-muted-foreground" />}
+                  <span>{bulkReEnrichMutation.isPending ? "Enriching..." : "Bulk Re-enrich"}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Export</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() => exportCsvMutation.mutate({ filters })}
+                  disabled={exportCsvMutation.isPending}
+                  className="gap-2 cursor-pointer"
+                >
+                  {exportCsvMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 text-muted-foreground" />}
+                  <span>Download CSV</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => gtcExportMutation.mutate({ filters: { tags: "GTC-2026" } as any })}
+                  disabled={gtcExportMutation.isPending}
+                  className="gap-2 cursor-pointer text-primary focus:text-primary"
+                >
+                  {gtcExportMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  <span>GTC Export</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setExportOpen(true)}
+                  className="gap-2 cursor-pointer"
+                >
+                  <Download className="h-4 w-4 text-muted-foreground" />
+                  <span>Export HubSpot CSV</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Dialog open={exportOpen} onOpenChange={setExportOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 border-border">
+                <Button variant="outline" size="sm" className="hidden sm:flex gap-2 border-border">
                   <Download className="h-4 w-4" />
-                  <span className="hidden sm:inline">Export HubSpot</span>
+                  Export HubSpot
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-sm bg-card border-border">
