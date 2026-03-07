@@ -93,6 +93,20 @@ export default function LeadsList() {
     onError: () => toast.error("GTC export failed"),
   });
 
+  const exportCsvMutation = trpc.leads.exportCsv.useMutation({
+    onSuccess: ({ csv, count }) => {
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `lektra-leads-${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded ${count} leads as CSV`);
+    },
+    onError: () => toast.error("CSV export failed"),
+  });
+
   const bulkReEnrichMutation = trpc.leads.bulkReEnrich.useMutation({
     onSuccess: ({ total, enriched }) => {
       utils.leads.list.invalidate();
@@ -147,6 +161,17 @@ export default function LeadsList() {
                 ? <Loader2 className="h-4 w-4 animate-spin" />
                 : <Sparkles className="h-4 w-4" />}
               <span className="hidden md:inline">{bulkReEnrichMutation.isPending ? "Enriching..." : "Bulk Re-enrich"}</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-border"
+              disabled={exportCsvMutation.isPending}
+              onClick={() => exportCsvMutation.mutate({ filters })}
+              title="Download all visible leads as CSV (respects active filters)"
+            >
+              {exportCsvMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              <span className="hidden sm:inline">Download CSV</span>
             </Button>
             <Button
               variant="outline"

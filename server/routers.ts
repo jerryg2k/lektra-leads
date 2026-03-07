@@ -901,6 +901,49 @@ Also generate a compelling subject line (max 8 words, no clickbait, specific to 
         return { csv, count: leadsData.length, previewOnly: false };
       }),
 
+    // ─── Simple CSV export (all leads, user-facing) ─────────────────────────
+    exportCsv: protectedProcedure
+      .input(
+        z.object({
+          filters: LeadFiltersSchema.optional(),
+        }).optional()
+      )
+      .mutation(async ({ input }) => {
+        const leadsData = await getLeads(input?.filters ?? {});
+        // Fetch last note per lead
+        const db = await getDb();
+        const noteRows = db ? await db
+          .select()
+          .from(notes)
+          .orderBy(desc(notes.createdAt)) : [];
+        const lastNoteMap: Record<number, string> = {};
+        for (const n of noteRows) {
+          if (n.leadId !== null && !lastNoteMap[n.leadId]) {
+            lastNoteMap[n.leadId] = n.content ?? "";
+          }
+        }
+        const headers = [
+          "Company", "Website", "Industry", "Funding Stage", "Location",
+          "Pipeline Stage", "Lead Type", "Score", "Follow-up Date", "Tags", "Last Note", "Source", "Created",
+        ];
+        const rows = leadsData.map((lead: any) => [
+          lead.companyName,
+          lead.website,
+          lead.industry,
+          lead.fundingStage,
+          lead.location,
+          lead.pipelineStage,
+          lead.leadType ?? "Prospect",
+          lead.score,
+          lead.followUpAt ? new Date(lead.followUpAt).toISOString().split("T")[0] : "",
+          Array.isArray(lead.tags) ? lead.tags.join("; ") : "",
+          lastNoteMap[lead.id] ?? "",
+          lead.source,
+          lead.createdAt ? new Date(lead.createdAt).toISOString().split("T")[0] : "",
+        ].map(escapeCSV).join(","));
+        const csv = [headers.map(escapeCSV).join(","), ...rows].join("\n");
+        return { csv, count: leadsData.length };
+      }),
     // ─── Auto-enrich a company by name or website ─────────────────────────────
     enrichLead: protectedProcedure
       .input(

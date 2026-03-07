@@ -289,3 +289,10 @@
 - [x] Dashboard: "Relationship Mix" card showing Prospect/Partner/Investor/Other counts with % bars
 - [x] Backend: leads.leadTypeStats procedure returns counts grouped by leadType
 - [x] Weekly digest email: Relationship Mix section (shown when Partners/Investors exist)
+
+## GTC Strategy Lead Type Badge & Leads CSV Export (new request)
+- [x] GTC Strategy tab: show Lead Type badge on each target card (pre-classify before adding to pipeline)
+- [x] GTC Strategy tab: lead type selector per target (defaults to global selector, overridable per card)
+- [x] Backend: gtc.addToPipeline — pass per-card leadType through
+- [x] Leads page: "Download CSV" button exporting company, stage, score, lead type, follow-up date, last note, tags
+- [x] Backend: leads.exportCsv procedure returning full CSV string

@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { ScoreBadge, StageBadge, GpuUseCaseTag } from "@/components/LeadBadges";
+import { ScoreBadge, StageBadge, GpuUseCaseTag, LeadTypeBadge } from "@/components/LeadBadges";
 import DashboardLayout from "@/components/DashboardLayout";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -390,6 +390,7 @@ export default function Discover() {
   const [batchEnriching, setBatchEnriching] = useState(false);
   const [discoverLeadType, setDiscoverLeadType] = useState<"Prospect" | "Partner" | "Investor" | "Other">("Prospect");
   const [gtcLeadType, setGtcLeadType] = useState<"Prospect" | "Partner" | "Investor" | "Other">("Prospect");
+  const [gtcCardLeadTypes, setGtcCardLeadTypes] = useState<Record<number, "Prospect" | "Partner" | "Investor" | "Other">>({});
 
   // Fetch filter options
   const { data: filterOpts } = trpc.discover.filterOptions.useQuery();
@@ -1003,6 +1004,10 @@ export default function Discover() {
                                   <Zap className="w-3 h-3" /> Score {target.priorityScore}
                                 </span>
                               )}
+                              {/* Per-card lead type badge */}
+                              {(gtcCardLeadTypes[target.id] ?? gtcLeadType) !== "Prospect" && (
+                                <LeadTypeBadge type={gtcCardLeadTypes[target.id] ?? gtcLeadType} />
+                              )}
                             </div>
                             {target.contactName && (
                               <p className="text-xs text-muted-foreground mt-1">
@@ -1016,6 +1021,19 @@ export default function Discover() {
                             )}
                           </div>
                           <div className="flex flex-col gap-2 shrink-0">
+                            {/* Per-card type selector */}
+                            {!isAdded && (
+                              <select
+                                value={gtcCardLeadTypes[target.id] ?? gtcLeadType}
+                                onChange={(e) => setGtcCardLeadTypes((prev) => ({ ...prev, [target.id]: e.target.value as "Prospect" | "Partner" | "Investor" | "Other" }))}
+                                className="text-xs bg-secondary border border-border rounded px-1.5 py-1 text-foreground cursor-pointer"
+                              >
+                                <option value="Prospect">Prospect</option>
+                                <option value="Partner">Partner</option>
+                                <option value="Investor">Investor</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            )}
                             {isAdded ? (
                               <span className="text-xs text-emerald-400 flex items-center gap-1">
                                 <CheckCircle2 className="w-3.5 h-3.5" /> In Pipeline
@@ -1025,7 +1043,7 @@ export default function Discover() {
                                 size="sm"
                                 variant="outline"
                                 className="h-7 text-xs gap-1"
-                                onClick={() => addToPipelineMutation.mutate({ targetId: target.id, leadType: gtcLeadType })}
+                                onClick={() => addToPipelineMutation.mutate({ targetId: target.id, leadType: gtcCardLeadTypes[target.id] ?? gtcLeadType })}
                                 disabled={addToPipelineMutation.isPending}
                               >
                                 <BookmarkPlus className="w-3.5 h-3.5" />
