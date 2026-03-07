@@ -1,4 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { FundingBadge, GpuRecommendBadge, LeadTypeBadge, ScoreBadge, StageBadge } from "@/components/LeadBadges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,6 +24,9 @@ export default function Pipeline() {
   const [, setLocation] = useLocation();
   const { data: leads, isLoading } = trpc.leads.list.useQuery({ isArchived: false });
   const utils = trpc.useUtils();
+  const { pullDistance, isRefreshing } = usePullToRefresh({
+    onRefresh: () => utils.leads.list.invalidate(),
+  });
 
   const updateStageMutation = trpc.leads.updateStage.useMutation({
     onSuccess: () => {
@@ -48,6 +53,7 @@ export default function Pipeline() {
 
   return (
     <DashboardLayout>
+      <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
       <div className="space-y-4 pb-8">
         <div className="flex items-center justify-between">
           <div>

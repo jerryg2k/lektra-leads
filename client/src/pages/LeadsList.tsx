@@ -1,4 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { FundingBadge, GpuRecommendBadge, LeadTypeBadge, ScoreBadge, StageBadge } from "@/components/LeadBadges";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -9,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { Bell, Building2, Check, ChevronDown, Download, Filter, Loader2, MoreHorizontal, Phone, Plus, ScanLine, Search, Sparkles, X } from "lucide-react";
+import { Bell, Building2, Check, CheckSquare, ChevronDown, Download, Filter, Loader2, MoreHorizontal, Phone, Plus, ScanLine, Search, Sparkles, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -116,6 +118,35 @@ export default function LeadsList() {
     onError: () => toast.error("Bulk re-enrich failed"),
   });
 
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkStageOpen, setBulkStageOpen] = useState(false);
+  const bulkUpdateStageMutation = trpc.leads.bulkUpdateStage.useMutation({
+    onSuccess: ({ updated }) => {
+      utils.leads.list.invalidate();
+      setSelectedIds(new Set());
+      setBulkStageOpen(false);
+      toast.success(`Updated stage for ${updated} lead${updated !== 1 ? "s" : ""}`);
+    },
+    onError: () => toast.error("Bulk update failed"),
+  });
+  const toggleSelect = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    if (selectedIds.size === displayedLeads.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(displayedLeads.map((l) => l.id)));
+    }
+  };
+  const { pullDistance, isRefreshing, isPulling } = usePullToRefresh({
+    onRefresh: () => utils.leads.list.invalidate(),
+  });
   const [pendingReviewMode, setPendingReviewMode] = useState(false);
 
   // When pending review mode is on, filter to auto-scan tagged leads
@@ -136,7 +167,8 @@ export default function LeadsList() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-4 pb-8">
+      <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
+      <div className="space-y-6 pb-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -477,8 +509,54 @@ export default function LeadsList() {
             {/* Desktop Table */}
             <div className="hidden md:block rounded-xl border border-border overflow-hidden">
               <table className="w-full">
+                {/* Bulk action bar */}
+                {selectedIds.size > 0 && (
+                  <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/10 border-b border-primary/20">
+                    <span className="text-sm font-medium text-primary">{selectedIds.size} selected</span>
+                    <div className="relative">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 text-xs border-primary/40 text-primary hover:bg-primary/10"
+                        onClick={() => setBulkStageOpen((v) => !v)}
+                        disabled={bulkUpdateStageMutation.isPending}
+                      >
+                        {bulkUpdateStageMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                        Move to Stage
+                      </Button>
+                      {bulkStageOpen && (
+                        <div className="absolute left-0 top-9 z-50 bg-popover border border-border rounded-lg shadow-xl py-1 w-44">
+                          {(["New", "Contacted", "Qualified", "Closed Won", "Closed Lost"] as const).map((stage) => (
+                            <button
+                              key={stage}
+                              onClick={() => bulkUpdateStageMutation.mutate({ ids: Array.from(selectedIds), stage })}
+                              className="w-full text-left text-xs px-3 py-1.5 hover:bg-secondary transition-colors text-foreground"
+                            >
+                              {stage}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs text-muted-foreground gap-1"
+                      onClick={() => setSelectedIds(new Set())}
+                    >
+                      <X className="h-3 w-3" /> Clear
+                    </Button>
+                  </div>
+                )}
                 <thead>
                   <tr className="border-b border-border bg-secondary/50">
+                    <th className="px-3 py-3 w-10">
+                      <button onClick={toggleSelectAll} className="text-muted-foreground hover:text-foreground transition-colors">
+                        {selectedIds.size === displayedLeads.length && displayedLeads.length > 0
+                          ? <CheckSquare className="h-4 w-4 text-primary" />
+                          : <Square className="h-4 w-4" />}
+                      </button>
+                    </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Company</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Industry</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Funding</th>
@@ -495,8 +573,15 @@ export default function LeadsList() {
                     <tr
                       key={lead.id}
                       onClick={() => setLocation(`/leads/${lead.id}`)}
-                      className="hover:bg-secondary/40 cursor-pointer transition-colors"
+                      className={`hover:bg-secondary/40 cursor-pointer transition-colors ${selectedIds.has(lead.id) ? "bg-primary/5" : ""}`}
                     >
+                      <td className="px-3 py-3 w-10" onClick={(e) => toggleSelect(lead.id, e)}>
+                        <button className="text-muted-foreground hover:text-primary transition-colors">
+                          {selectedIds.has(lead.id)
+                            ? <CheckSquare className="h-4 w-4 text-primary" />
+                            : <Square className="h-4 w-4" />}
+                        </button>
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">

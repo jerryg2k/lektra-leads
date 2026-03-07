@@ -307,3 +307,10 @@
 - [x] Dashboard page: collapse secondary header buttons (Send Digest, Scan Card, Batch Scan) into "Actions ⋯" overflow menu on mobile (Pipeline header had no buttons to collapse)
 - [x] Leads page: sticky search bar + filter toggle on mobile (stays visible while scrolling)
 - [x] Leads page: full-width labelled "Change Stage" + "Add Note" button strip on mobile lead cards (replaces tiny icon-only row)
+
+## Bulk Stage Update, Pull-to-Refresh & Mobile Lead Detail (new request)
+- [x] Leads table: row checkboxes + bulk "Move to Stage" action bar
+- [x] Backend: leads.bulkUpdateStage procedure
+- [x] Pull-to-refresh on mobile Leads page (usePullToRefresh hook + PullToRefreshIndicator)
+- [x] Pull-to-refresh on mobile Pipeline page
+- [x] Lead Detail: floating "Add Note" FAB on mobile + pull-to-refresh

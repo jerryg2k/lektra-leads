@@ -609,6 +609,17 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    bulkUpdateStage: protectedProcedure
+      .input(
+        z.object({
+          ids: z.array(z.number()).min(1).max(200),
+          stage: z.enum(["New", "Contacted", "Qualified", "Closed Won", "Closed Lost"]),
+        })
+      )
+      .mutation(async ({ input }) => {
+        await Promise.all(input.ids.map((id) => updateLead(id, { pipelineStage: input.stage })));
+        return { updated: input.ids.length };
+      }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {

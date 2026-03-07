@@ -1,4 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { FundingBadge, GpuRecommendBadge, GpuUseCaseTag, LeadTypeBadge, ScoreBadge, StageBadge } from "@/components/LeadBadges";
 import { CompletenessBar } from "@/pages/LeadsList";
 import { Button } from "@/components/ui/button";
@@ -251,6 +253,13 @@ export default function LeadDetail() {
   const { data: contacts } = trpc.contacts.listByLead.useQuery({ leadId: id });
   const { data: notes } = trpc.notes.listByLead.useQuery({ leadId: id });
   const [noteRefreshKey, setNoteRefreshKey] = useState(0);
+  const [fabNoteOpen, setFabNoteOpen] = useState(false);
+  const { pullDistance, isRefreshing } = usePullToRefresh({
+    onRefresh: async () => {
+      await utils.leads.get.invalidate({ id });
+      await utils.notes.listByLead.invalidate({ leadId: id });
+    },
+  });
 
   const updateStageMutation = trpc.leads.updateStage.useMutation({
     onSuccess: () => {
@@ -327,7 +336,38 @@ export default function LeadDetail() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-4xl mx-auto space-y-5 pb-10">
+      <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
+      {/* Floating Add Note FAB — mobile only */}
+      <div className="md:hidden fixed bottom-6 right-4 z-40">
+        {fabNoteOpen ? (
+          <div className="bg-card border border-border rounded-2xl shadow-2xl p-4 w-80 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                <MessageSquare className="h-4 w-4 text-primary" /> Add Note
+              </span>
+              <button onClick={() => setFabNoteOpen(false)} className="text-muted-foreground hover:text-foreground">
+                <Plus className="h-4 w-4 rotate-45" />
+              </button>
+            </div>
+            <AddNoteForm
+              leadId={id}
+              onSuccess={() => {
+                utils.notes.listByLead.invalidate({ leadId: id });
+                setNoteRefreshKey(k => k + 1);
+                setFabNoteOpen(false);
+              }}
+            />
+          </div>
+        ) : (
+          <Button
+            onClick={() => setFabNoteOpen(true)}
+            className="h-14 w-14 rounded-full shadow-2xl bg-primary hover:bg-primary/90 text-primary-foreground p-0"
+          >
+            <MessageSquare className="h-6 w-6" />
+          </Button>
+        )}
+      </div>
+      <div className="max-w-4xl mx-auto space-y-5 pb-24 md:pb-10">
         {/* Back + Header */}
         <div className="flex items-center gap-3">
           <Button
