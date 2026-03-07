@@ -302,3 +302,8 @@
 - [x] Keep "Add Lead" as the primary CTA always visible on mobile
 - [x] Ensure each menu item has an icon + clear text label
 - [x] Preserve full button row on desktop (sm: and above)
+
+## Mobile UX Improvements Round 2 (new request)
+- [x] Dashboard page: collapse secondary header buttons (Send Digest, Scan Card, Batch Scan) into "Actions ⋯" overflow menu on mobile (Pipeline header had no buttons to collapse)
+- [x] Leads page: sticky search bar + filter toggle on mobile (stays visible while scrolling)
+- [x] Leads page: full-width labelled "Change Stage" + "Add Note" button strip on mobile lead cards (replaces tiny icon-only row)

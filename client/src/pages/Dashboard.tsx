@@ -19,6 +19,7 @@ import {
   Loader2,
   Mail,
   MessageSquare,
+  MoreHorizontal,
   Pencil,
   Plus,
   Radio,
@@ -29,6 +30,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -96,10 +98,11 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Desktop: full buttons */}
             <Button
               variant="outline"
               size="sm"
-              className="gap-2 border-border text-xs"
+              className="hidden sm:flex gap-2 border-border text-xs"
               onClick={() => sendDigestMutation.mutate()}
               disabled={sendDigestMutation.isPending}
               title="Send weekly BD digest now (also auto-sends every Monday 7AM UTC)"
@@ -109,8 +112,45 @@ export default function Dashboard() {
               ) : (
                 <Mail className="h-3.5 w-3.5" />
               )}
-              <span className="hidden sm:inline">{sendDigestMutation.isPending ? "Sending..." : "Send Digest"}</span>
+              {sendDigestMutation.isPending ? "Sending..." : "Send Digest"}
             </Button>
+
+            {/* Mobile: Actions overflow menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 sm:hidden">
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="text-xs font-medium">Actions</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-card border-border">
+                <DropdownMenuItem
+                  onClick={() => sendDigestMutation.mutate()}
+                  disabled={sendDigestMutation.isPending}
+                  className="gap-2 cursor-pointer"
+                >
+                  {sendDigestMutation.isPending
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <Mail className="h-4 w-4 text-muted-foreground" />}
+                  <span>{sendDigestMutation.isPending ? "Sending..." : "Send Digest"}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setLocation("/scan-card")}
+                  className="gap-2 cursor-pointer"
+                >
+                  <ScanLine className="h-4 w-4 text-muted-foreground" />
+                  <span>Scan Card</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setLocation("/batch-scan")}
+                  className="gap-2 cursor-pointer"
+                >
+                  <ScanLine className="h-4 w-4 text-muted-foreground" />
+                  <span>Batch Scan</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button
               onClick={() => setLocation("/leads")}
               className="gap-2"

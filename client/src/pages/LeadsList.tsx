@@ -317,6 +317,8 @@ export default function LeadsList() {
           </div>
         </div>
 
+        {/* Sticky search + filter bar on mobile */}
+        <div className="sticky top-0 z-10 -mx-4 px-4 sm:mx-0 sm:px-0 sm:static sm:z-auto bg-background/95 backdrop-blur-sm sm:bg-transparent sm:backdrop-blur-none pb-2 sm:pb-0 pt-1 sm:pt-0 space-y-2">
         {/* Quick filter tabs */}
         <div className="flex gap-1 p-1 bg-secondary/50 rounded-xl w-fit">
           <button
@@ -456,6 +458,7 @@ export default function LeadsList() {
           </div>
         )}
 
+        </div>{/* end sticky wrapper */}
         {/* Lead Table / Cards */}
         {isLoading ? (
           <div className="space-y-2">
@@ -582,9 +585,8 @@ export default function LeadsList() {
                   <div className="mt-2">
                     <CompletenessBar score={(lead as any).completenessScore ?? 0} />
                   </div>
-                  <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Quick actions</span>
-                    <QuickActions lead={lead} />
+                  <div className="mt-2 pt-2 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
+                    <MobileQuickActions lead={lead} />
                   </div>
                 </button>
               ))}
@@ -1048,5 +1050,95 @@ function AddLeadForm({ onSuccess }: { onSuccess: () => void }) {
         )}
       </Button>
     </form>
+  );
+}
+
+// ─── Mobile Quick Actions ──────────────────────────────────────────────────
+// Full-width labelled button strip shown on mobile lead cards
+function MobileQuickActions({ lead }: { lead: { id: number; companyName: string; pipelineStage?: string | null; followUpAt?: Date | null } }) {
+  const utils = trpc.useUtils();
+  const [stageOpen, setStageOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteContent, setNoteContent] = useState("");
+
+  const updateStageMutation = trpc.leads.updateStage.useMutation({
+    onSuccess: () => { utils.leads.list.invalidate(); setStageOpen(false); toast.success("Stage updated"); },
+  });
+  const createNoteMutation = trpc.notes.create.useMutation({
+    onSuccess: () => { utils.leads.list.invalidate(); setNoteOpen(false); setNoteContent(""); toast.success("Note added"); },
+  });
+
+  const STAGE_OPTIONS = ["New", "Contacted", "Qualified", "Closed Won", "Closed Lost"] as const;
+
+  return (
+    <div className="space-y-2">
+      {/* Button strip */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => { setStageOpen((v) => !v); setNoteOpen(false); }}
+          className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-medium py-1.5 rounded-lg border transition-colors ${
+            stageOpen ? "bg-primary/10 border-primary/40 text-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+          }`}
+        >
+          <ChevronDown className="h-3.5 w-3.5" />
+          Change Stage
+        </button>
+        <button
+          onClick={() => { setNoteOpen((v) => !v); setStageOpen(false); }}
+          className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-medium py-1.5 rounded-lg border transition-colors ${
+            noteOpen ? "bg-primary/10 border-primary/40 text-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+          }`}
+        >
+          <Phone className="h-3.5 w-3.5" />
+          Add Note
+        </button>
+      </div>
+
+      {/* Stage picker */}
+      {stageOpen && (
+        <div className="grid grid-cols-3 gap-1.5">
+          {STAGE_OPTIONS.map((stage) => (
+            <button
+              key={stage}
+              onClick={() => updateStageMutation.mutate({ id: lead.id, stage })}
+              disabled={updateStageMutation.isPending}
+              className={`text-[11px] px-2 py-1.5 rounded-lg border font-medium transition-colors ${
+                lead.pipelineStage === stage
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              }`}
+            >
+              {lead.pipelineStage === stage && <Check className="inline h-3 w-3 mr-0.5" />}
+              {stage}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Note input */}
+      {noteOpen && (
+        <div className="space-y-1.5">
+          <textarea
+            value={noteContent}
+            onChange={(e) => setNoteContent(e.target.value)}
+            placeholder="Add a note..."
+            className="w-full text-xs bg-secondary border border-border rounded-lg p-2 resize-none h-16 text-foreground placeholder:text-muted-foreground"
+            autoFocus
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => { if (noteContent.trim()) createNoteMutation.mutate({ leadId: lead.id, content: noteContent, noteType: "Note" }); }}
+              disabled={!noteContent.trim() || createNoteMutation.isPending}
+              className="flex-1 text-xs bg-primary text-primary-foreground rounded-lg px-3 py-1.5 hover:bg-primary/90 disabled:opacity-50 font-medium"
+            >
+              {createNoteMutation.isPending ? "Saving..." : "Save Note"}
+            </button>
+            <button onClick={() => setNoteOpen(false)} className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
