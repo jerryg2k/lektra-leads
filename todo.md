@@ -314,3 +314,9 @@
 - [x] Pull-to-refresh on mobile Leads page (usePullToRefresh hook + PullToRefreshIndicator)
 - [x] Pull-to-refresh on mobile Pipeline page
 - [x] Lead Detail: floating "Add Note" FAB on mobile + pull-to-refresh
+
+## Bug: Mark Complete Does Nothing on Overdue Follow-up (reported)
+- [x] Root cause: Drizzle ORM ignores `undefined` fields in `.set()`, so `date ?? undefined` never wrote NULL to the DB
+- [x] Fix: use `sql\`NULL\`` literal for followUpAt and followUpNote when clearing
+- [x] Add `sql` to drizzle-orm imports, consolidate duplicate `getDb` import
+- [x] 38 tests passing, 0 TS errors

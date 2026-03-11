@@ -20,6 +20,7 @@ import {
   updateContact,
   updateLead,
   upsertUserSettings,
+  getDb,
 } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -31,11 +32,10 @@ import {
 } from "./scoring";
 import { discoverRouter } from "./routers/discover";
 import { invokeLLM } from "./_core/llm";
-import { getDb } from "./db";
 import { emailSequences, notes, scanHistory, leads, cardScans, gtcTargets } from "../drizzle/schema";
 import { sendWeeklyDigest } from "./weeklyDigest";
 import { runDailyScan } from "./dailyScan";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 
 // ─── Zod Schemas ──────────────────────────────────────────────────────────────
 
@@ -1238,10 +1238,15 @@ Return JSON: { "description": string, "industry": string, "subIndustry": string,
       )
       .mutation(async ({ input, ctx }) => {
         const date = input.followUpAt ? new Date(input.followUpAt) : null;
-        await updateLead(input.id, {
-          followUpAt: date ?? undefined,
-          followUpNote: input.followUpNote ?? undefined,
-        } as any);
+        // Use explicit SQL null to clear the column — Drizzle ignores `undefined` fields
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        await db.update(leads)
+          .set({
+            followUpAt: date !== null ? date : sql`NULL`,
+            followUpNote: input.followUpNote !== undefined ? input.followUpNote : sql`NULL`,
+          } as any)
+          .where(eq(leads.id, input.id));
 
         // Auto-log a Follow-up note when snoozed or marked complete
         if (input.action === "snooze" && input.snoozeDays) {
