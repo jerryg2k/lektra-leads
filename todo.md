@@ -320,3 +320,9 @@
 - [x] Fix: use `sql\`NULL\`` literal for followUpAt and followUpNote when clearing
 - [x] Add `sql` to drizzle-orm imports, consolidate duplicate `getDb` import
 - [x] 38 tests passing, 0 TS errors
+
+## Follow-up Bug Hardening & Toast (new request)
+- [x] Snooze verified: passes real ISO date string, no null skip issue
+- [x] All updateLead callers audited: only setFollowUp had the null-skip bug (already fixed)
+- [x] Named toast on Mark Complete: "Follow-up cleared for [Company]"
+- [x] Named toast on Snooze: "[Company] snoozed N days"

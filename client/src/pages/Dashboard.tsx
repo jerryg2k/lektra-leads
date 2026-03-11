@@ -516,17 +516,22 @@ function NeedsAttentionSection({ leads }: { leads: any[] }) {
   });
 
   const clearFollowUpMutation = trpc.leads.setFollowUp.useMutation({
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       utils.leads.overdueFollowUps.invalidate();
-      toast.success("Follow-up cleared");
+      const name = (variables as any)._companyName as string | undefined;
+      toast.success(name ? `Follow-up cleared for ${name}` : "Follow-up cleared");
     },
     onError: () => toast.error("Failed to clear follow-up"),
   });
 
   const snoozeFollowUpMutation = trpc.leads.setFollowUp.useMutation({
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       utils.leads.overdueFollowUps.invalidate();
-      toast.success("Snoozed 3 days");
+      const name = (variables as any)._companyName as string | undefined;
+      const days = (variables as any).snoozeDays as number | undefined;
+      toast.success(name
+        ? `${name} snoozed ${days ?? 3} day${(days ?? 3) !== 1 ? "s" : ""}`
+        : `Snoozed ${days ?? 3} days`);
     },
     onError: () => toast.error("Failed to snooze"),
   });
@@ -574,7 +579,7 @@ function NeedsAttentionSection({ leads }: { leads: any[] }) {
               lead={lead}
               onGoToNotes={() => setLocation(`/leads/${lead.id}#notes`)}
               onMarkComplete={() =>
-                clearFollowUpMutation.mutate({ id: lead.id, followUpAt: null, followUpNote: "" })
+                clearFollowUpMutation.mutate({ id: lead.id, followUpAt: null, followUpNote: "", action: "complete", _companyName: lead.companyName } as any)
               }
               onSnooze={(days: number) => {
                 const snoozeDate = new Date();
@@ -585,7 +590,8 @@ function NeedsAttentionSection({ leads }: { leads: any[] }) {
                   followUpNote: lead.followUpNote ?? "",
                   action: "snooze",
                   snoozeDays: days,
-                });
+                  _companyName: lead.companyName,
+                } as any);
               }}
               onSaveEdit={(date, note) =>
                 setFollowUpMutation.mutate({ id: lead.id, followUpAt: date, followUpNote: note })
