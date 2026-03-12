@@ -124,8 +124,8 @@ function renderApp() {
           // After Auth0 redirects back, navigate to the original page
           window.location.replace(appState?.returnTo ?? "/");
         }}
-        cacheLocation="memory"
-        useRefreshTokens={true}
+        cacheLocation="localstorage"
+        useRefreshTokens={false}
       >
         <Auth0TokenBridge />
         {AppTree}
