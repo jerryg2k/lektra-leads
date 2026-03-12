@@ -10,14 +10,7 @@ import { Auth0TokenBridge } from "./_core/Auth0TokenBridge";
 import { getLoginUrl } from "./const";
 import "./index.css";
 
-// Register service worker for GTC 2026 offline support
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {
-      // SW registration failure is non-fatal
-    });
-  });
-}
+// Service worker disabled — was causing stale cache issues with Auth0 login flow
 
 // ─── Auth0 configuration ──────────────────────────────────────────────────────
 const AUTH0_DOMAIN = import.meta.env.VITE_AUTH0_DOMAIN as string | undefined;
