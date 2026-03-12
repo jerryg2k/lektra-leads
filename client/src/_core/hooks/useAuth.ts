@@ -8,6 +8,7 @@
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
+import { useAuth0 as _useAuth0 } from "@auth0/auth0-react";
 import { useCallback, useEffect, useMemo } from "react";
 
 // Detect whether Auth0 is configured
@@ -17,16 +18,13 @@ const IS_AUTH0 = Boolean(AUTH0_DOMAIN);
 // ─── Auth0 path ───────────────────────────────────────────────────────────────
 
 function useAuth0Mode(options?: UseAuthOptions) {
-  // Dynamically import Auth0 hook — tree-shaken when IS_AUTH0 is false at build time.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { useAuth0 } = require("@auth0/auth0-react") as typeof import("@auth0/auth0-react");
   const {
     user: auth0User,
     isLoading,
     isAuthenticated,
     loginWithRedirect,
     logout: auth0Logout,
-  } = useAuth0();
+  } = _useAuth0();
 
   const { redirectOnUnauthenticated = false } = options ?? {};
 

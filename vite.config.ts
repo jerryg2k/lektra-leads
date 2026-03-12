@@ -164,14 +164,22 @@ export default defineConfig({
       "@": path.resolve(__dirname, "client", "src"),
       "@shared": path.resolve(__dirname, "shared"),
       "@assets": path.resolve(__dirname, "attached_assets"),
+      // Force ESM build of auth0-react to avoid require() in browser bundle
+      "@auth0/auth0-react": path.resolve(__dirname, "node_modules/@auth0/auth0-react/dist/auth0-react.esm.js"),
     },
   },
   envDir: path.resolve(__dirname),
   root: path.resolve(__dirname, "client"),
   publicDir: path.resolve(__dirname, "client", "public"),
+  optimizeDeps: {
+    include: ["@auth0/auth0-react"],
+  },
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
+    commonjsOptions: {
+      include: [/@auth0\/auth0-react/, /node_modules/],
+    },
   },
   server: {
     host: true,
