@@ -326,3 +326,23 @@
 - [x] All updateLead callers audited: only setFollowUp had the null-skip bug (already fixed)
 - [x] Named toast on Mark Complete: "Follow-up cleared for [Company]"
 - [x] Named toast on Snooze: "[Company] snoozed N days"
+
+## Auth0 Migration (new request)
+- [ ] Audit Manus OAuth: context.ts, oauth.ts, session handling, frontend useAuth hook
+- [ ] Server: replace Manus JWT verification with Auth0 JWKS verification
+- [ ] Server: replace /api/oauth/callback with Auth0 callback handler
+- [ ] Server: update protectedProcedure ctx.user to use Auth0 claims
+- [ ] Server: upsert user record in DB on first Auth0 login
+- [ ] Frontend: install @auth0/auth0-react SDK
+- [ ] Frontend: replace getLoginUrl() / useAuth() with Auth0 hooks
+- [ ] Frontend: wrap app in Auth0Provider
+- [ ] Frontend: update all protected routes to use Auth0 isAuthenticated
+- [ ] Add AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_AUDIENCE env vars
+- [ ] Write Auth0 setup instructions in MIGRATION.md
+- [ ] Update tests to mock Auth0 instead of Manus OAuth
+
+## Railway Migration Files (new request)
+- [x] railway.toml — Nixpacks build + start command + health check config
+- [x] .dockerignore — exclude node_modules, dist, logs, secrets
+- [x] /api/health endpoint added to server for Railway health checks
+- [x] MIGRATION.md — full step-by-step guide: GitHub export, Railway provisioning, env vars, Auth0 setup, DNS

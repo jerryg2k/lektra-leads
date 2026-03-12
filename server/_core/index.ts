@@ -51,6 +51,9 @@ async function startServer() {
     }
   });
 
+  // Health check for Railway / load balancers
+  app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
+
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API
