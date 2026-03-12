@@ -1,30 +1,44 @@
 /**
  * Auth0Callback
  *
- * This page is the redirect target after Auth0 Universal Login completes.
- * Auth0Provider's onRedirectCallback handles the actual token exchange and
- * navigation — this component just shows a loading state while that happens.
+ * Handles the redirect from Auth0 Universal Login.
+ * Calls handleRedirectCallback() directly to complete the PKCE code exchange,
+ * then navigates to the dashboard (or the original page if appState.returnTo is set).
  */
-import { useEffect } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
-import { useLocation } from "wouter";
+import { useEffect, useState } from "react";
 
 export default function Auth0Callback() {
-  const { isLoading, error, isAuthenticated } = useAuth0();
-  const [, navigate] = useLocation();
+  const { handleRedirectCallback, error: auth0Error } = useAuth0();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      navigate("/");
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (!code) {
+      window.location.replace("/");
+      return;
     }
-  }, [isLoading, isAuthenticated, navigate]);
 
-  if (error) {
+    handleRedirectCallback()
+      .then((result) => {
+        const returnTo = result?.appState?.returnTo ?? "/";
+        window.location.replace(returnTo);
+      })
+      .catch((err) => {
+        console.error("[Auth0Callback] handleRedirectCallback failed:", err);
+        setError(err?.message ?? "Authentication failed. Please try again.");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (error || auth0Error) {
+    const msg = error ?? auth0Error?.message ?? "Unknown error";
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <div className="text-center space-y-4 max-w-md px-4">
           <h1 className="text-2xl font-bold text-destructive">Login Failed</h1>
-          <p className="text-muted-foreground">{error.message}</p>
+          <p className="text-muted-foreground text-sm font-mono break-all">{msg}</p>
           <a
             href="/"
             className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm"
