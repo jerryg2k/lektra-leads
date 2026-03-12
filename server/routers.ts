@@ -370,7 +370,14 @@ export const appRouter = router({
   cardScanner: cardScannerRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
+    // Auth0 logout is stateless on the server — the frontend calls Auth0's
+    // /v2/logout endpoint directly via the Auth0 SDK. This procedure is kept
+    // for backward compatibility with the Manus dev environment (cookie clear)
+    // and for the useAuth hook to call without branching.
     logout: publicProcedure.mutation(({ ctx }) => {
+      // Legacy Manus session cookie clear.
+      // In Auth0 mode this is a no-op (no cookie is set), but it is harmless
+      // and keeps the Manus dev environment working without code changes.
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;

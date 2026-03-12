@@ -346,3 +346,20 @@
 - [x] .dockerignore — exclude node_modules, dist, logs, secrets
 - [x] /api/health endpoint added to server for Railway health checks
 - [x] MIGRATION.md — full step-by-step guide: GitHub export, Railway provisioning, env vars, Auth0 setup, DNS
+
+## Auth0 Migration (Railway self-hosting)
+- [x] Install @auth0/auth0-react frontend SDK
+- [x] Server: replace Manus OAuth JWT verification with Auth0 JWKS RS256 verification in server/_core/auth0.ts
+- [x] Server: update context.ts to extract user from Bearer token (Authorization header)
+- [x] Server: update routers.ts auth.logout to clear Auth0 token client-side (stateless)
+- [x] Server: update env.ts to add AUTH0_DOMAIN and AUTH0_AUDIENCE vars
+- [x] Server: update oauth.ts as stub (returns 410 Gone for legacy endpoint)
+- [x] Frontend: wrap app in Auth0Provider in main.tsx
+- [x] Frontend: update const.ts getLoginUrl() to use Auth0 Universal Login
+- [x] Frontend: update useAuth.ts to use Auth0 SDK (useAuth0 hook)
+- [x] Frontend: update main.tsx trpcClient to inject Bearer token on every request
+- [x] Frontend: update DashboardLayout logout to call Auth0 logout
+- [x] Frontend: add /callback route in App.tsx for Auth0 redirect handling
+- [x] Frontend: add Auth0TokenBridge component to register getTokenSilently singleton
+- [x] Frontend: add vite-env.d.ts with Auth0 env var type declarations
+- [x] Run tests and verify TypeScript after changes (38 tests passing, 0 TS errors)

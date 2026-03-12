@@ -1,53 +1,24 @@
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
-import type { Express, Request, Response } from "express";
-import * as db from "../db";
-import { getSessionCookieOptions } from "./cookies";
-import { sdk } from "./sdk";
-
-function getQueryParam(req: Request, key: string): string | undefined {
-  const value = req.query[key];
-  return typeof value === "string" ? value : undefined;
-}
+/**
+ * OAuth route registration — Auth0 migration stub.
+ *
+ * The original Manus OAuth callback (/api/oauth/callback) is no longer used.
+ * Authentication is now handled entirely by Auth0 on the frontend (PKCE flow)
+ * and verified server-side via JWKS JWT validation in server/_core/auth0.ts.
+ *
+ * This file is kept as a stub so that existing imports in server/_core/index.ts
+ * continue to compile without changes. The registered route returns 410 Gone
+ * to clearly signal that the old Manus OAuth endpoint is retired.
+ */
+import type { Express } from "express";
 
 export function registerOAuthRoutes(app: Express) {
-  app.get("/api/oauth/callback", async (req: Request, res: Response) => {
-    const code = getQueryParam(req, "code");
-    const state = getQueryParam(req, "state");
-
-    if (!code || !state) {
-      res.status(400).json({ error: "code and state are required" });
-      return;
-    }
-
-    try {
-      const tokenResponse = await sdk.exchangeCodeForToken(code, state);
-      const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
-
-      if (!userInfo.openId) {
-        res.status(400).json({ error: "openId missing from user info" });
-        return;
-      }
-
-      await db.upsertUser({
-        openId: userInfo.openId,
-        name: userInfo.name || null,
-        email: userInfo.email ?? null,
-        loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
-        lastSignedIn: new Date(),
-      });
-
-      const sessionToken = await sdk.createSessionToken(userInfo.openId, {
-        name: userInfo.name || "",
-        expiresInMs: ONE_YEAR_MS,
-      });
-
-      const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-
-      res.redirect(302, "/");
-    } catch (error) {
-      console.error("[OAuth] Callback failed", error);
-      res.status(500).json({ error: "OAuth callback failed" });
-    }
+  // Legacy Manus OAuth callback — no longer active.
+  // Auth0 handles authentication via the frontend PKCE flow.
+  app.get("/api/oauth/callback", (_req, res) => {
+    res.status(410).json({
+      error: "This OAuth endpoint has been retired.",
+      message:
+        "Authentication is now handled by Auth0. Please use the app login flow.",
+    });
   });
 }

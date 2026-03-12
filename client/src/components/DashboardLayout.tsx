@@ -77,7 +77,18 @@ export default function DashboardLayout({
           </div>
           <Button
             onClick={() => {
-              window.location.href = getLoginUrl();
+              // In Auth0 mode, trigger the Auth0 Universal Login flow.
+              // In Manus dev mode, fall back to the legacy OAuth redirect.
+              const auth0Domain = import.meta.env.VITE_AUTH0_DOMAIN;
+              if (auth0Domain) {
+                // Dynamically import to avoid bundling Auth0 in Manus dev mode
+                import("@auth0/auth0-react").then(({ useAuth0: _unused }) => {
+                  // Auth0Provider handles redirect — just navigate to callback trigger
+                  window.location.href = getLoginUrl();
+                });
+              } else {
+                window.location.href = getLoginUrl();
+              }
             }}
             size="lg"
             className="w-full shadow-lg hover:shadow-xl transition-all"

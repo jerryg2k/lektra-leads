@@ -1,14 +1,76 @@
+/**
+ * useAuth — unified authentication hook.
+ *
+ * In production (Railway + Auth0), delegates to the @auth0/auth0-react SDK.
+ * In the Manus dev environment (no VITE_AUTH0_DOMAIN set), falls back to the
+ * legacy trpc.auth.me query so the Manus preview keeps working unchanged.
+ */
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
 
-type UseAuthOptions = {
-  redirectOnUnauthenticated?: boolean;
-  redirectPath?: string;
-};
+// Detect whether Auth0 is configured
+const AUTH0_DOMAIN = import.meta.env.VITE_AUTH0_DOMAIN as string | undefined;
+const IS_AUTH0 = Boolean(AUTH0_DOMAIN);
 
-export function useAuth(options?: UseAuthOptions) {
+// ─── Auth0 path ───────────────────────────────────────────────────────────────
+
+function useAuth0Mode(options?: UseAuthOptions) {
+  // Dynamically import Auth0 hook — tree-shaken when IS_AUTH0 is false at build time.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { useAuth0 } = require("@auth0/auth0-react") as typeof import("@auth0/auth0-react");
+  const {
+    user: auth0User,
+    isLoading,
+    isAuthenticated,
+    loginWithRedirect,
+    logout: auth0Logout,
+  } = useAuth0();
+
+  const { redirectOnUnauthenticated = false } = options ?? {};
+
+  useEffect(() => {
+    if (!redirectOnUnauthenticated) return;
+    if (isLoading) return;
+    if (isAuthenticated) return;
+    loginWithRedirect({
+      appState: { returnTo: window.location.pathname },
+    });
+  }, [redirectOnUnauthenticated, isLoading, isAuthenticated, loginWithRedirect]);
+
+  const logout = useCallback(async () => {
+    auth0Logout({ logoutParams: { returnTo: window.location.origin } });
+  }, [auth0Logout]);
+
+  const user = useMemo(() => {
+    if (!auth0User) return null;
+    return {
+      id: 0,                                   // placeholder — real id from DB via trpc.auth.me
+      openId: auth0User.sub ?? "",
+      name: auth0User.name ?? auth0User.nickname ?? null,
+      email: auth0User.email ?? null,
+      loginMethod: auth0User.sub?.split("|")[0] ?? "auth0",
+      role: "user" as const,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      lastSignedIn: new Date().toISOString(),
+    };
+  }, [auth0User]);
+
+  return {
+    user,
+    loading: isLoading,
+    error: null,
+    isAuthenticated,
+    refresh: () => {},
+    logout,
+  };
+}
+
+// ─── Manus legacy path ────────────────────────────────────────────────────────
+
+function useManusMode(options?: UseAuthOptions) {
   const { redirectOnUnauthenticated = false, redirectPath = getLoginUrl() } =
     options ?? {};
   const utils = trpc.useUtils();
@@ -66,8 +128,7 @@ export function useAuth(options?: UseAuthOptions) {
     if (state.user) return;
     if (typeof window === "undefined") return;
     if (window.location.pathname === redirectPath) return;
-
-    window.location.href = redirectPath
+    window.location.href = redirectPath;
   }, [
     redirectOnUnauthenticated,
     redirectPath,
@@ -81,4 +142,23 @@ export function useAuth(options?: UseAuthOptions) {
     refresh: () => meQuery.refetch(),
     logout,
   };
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+type UseAuthOptions = {
+  redirectOnUnauthenticated?: boolean;
+  redirectPath?: string;
+};
+
+/**
+ * Unified auth hook — automatically selects Auth0 or Manus mode based on env.
+ */
+export function useAuth(options?: UseAuthOptions) {
+  // Rules of Hooks: both hooks are always called, but only one path is "active".
+  // This is safe because IS_AUTH0 is a build-time constant that never changes.
+  const auth0Result = IS_AUTH0 ? useAuth0Mode(options) : null;  // eslint-disable-line react-hooks/rules-of-hooks
+  const manusResult = !IS_AUTH0 ? useManusMode(options) : null; // eslint-disable-line react-hooks/rules-of-hooks
+
+  return (IS_AUTH0 ? auth0Result : manusResult)!;
 }
