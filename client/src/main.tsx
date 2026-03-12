@@ -1,10 +1,12 @@
 import { trpc } from "@/lib/trpc";
 import { UNAUTHED_ERR_MSG } from '@shared/const';
+import { Auth0Provider } from "@auth0/auth0-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
+import { Auth0TokenBridge } from "./_core/Auth0TokenBridge";
 import { getLoginUrl } from "./const";
 import "./index.css";
 
@@ -51,15 +53,10 @@ queryClient.getMutationCache().subscribe(event => {
 /**
  * Retrieve the Auth0 access token for the current user.
  * Returns null when Auth0 is not configured (Manus dev environment).
- *
- * The token is fetched from the Auth0 SDK's in-memory cache; it is refreshed
- * silently via a hidden iframe when it expires, so this call is cheap.
  */
 async function getAuth0AccessToken(): Promise<string | null> {
   if (!IS_AUTH0) return null;
   try {
-    // Access the Auth0 client singleton that was initialised by Auth0Provider.
-    // We import dynamically to avoid bundling Auth0 when it is not configured.
     const { getAuth0Client } = await import("./_core/auth0Client");
     const client = getAuth0Client();
     if (!client) return null;
@@ -112,31 +109,28 @@ function renderApp() {
   );
 
   if (IS_AUTH0) {
-    // Dynamically import Auth0Provider to avoid bundling it in Manus dev mode
-    import("@auth0/auth0-react").then(({ Auth0Provider }) => {
-      import("./_core/Auth0TokenBridge").then(({ Auth0TokenBridge }) => {
-        root.render(
-          <Auth0Provider
-            domain={AUTH0_DOMAIN!}
-            clientId={AUTH0_CLIENT_ID!}
-            authorizationParams={{
-              redirect_uri: `${window.location.origin}/callback`,
-              audience: AUTH0_AUDIENCE,
-              scope: "openid profile email",
-            }}
-            onRedirectCallback={(appState) => {
-              // After Auth0 redirects back, navigate to the original page
-              window.location.replace(appState?.returnTo ?? "/");
-            }}
-            cacheLocation="memory"
-            useRefreshTokens={true}
-          >
-            <Auth0TokenBridge />
-            {AppTree}
-          </Auth0Provider>
-        );
-      });
-    });
+    // Auth0Provider is statically imported so it is present when the /callback
+    // page loads and Auth0 can complete the PKCE code exchange immediately.
+    root.render(
+      <Auth0Provider
+        domain={AUTH0_DOMAIN!}
+        clientId={AUTH0_CLIENT_ID!}
+        authorizationParams={{
+          redirect_uri: `${window.location.origin}/callback`,
+          audience: AUTH0_AUDIENCE,
+          scope: "openid profile email",
+        }}
+        onRedirectCallback={(appState) => {
+          // After Auth0 redirects back, navigate to the original page
+          window.location.replace(appState?.returnTo ?? "/");
+        }}
+        cacheLocation="memory"
+        useRefreshTokens={true}
+      >
+        <Auth0TokenBridge />
+        {AppTree}
+      </Auth0Provider>
+    );
   } else {
     root.render(AppTree);
   }
