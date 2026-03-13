@@ -114,8 +114,11 @@ function renderApp() {
           scope: "openid profile email",
         }}
         onRedirectCallback={(appState) => {
-          // After Auth0 redirects back, navigate to the original page
-          window.location.replace(appState?.returnTo ?? "/");
+          // Use history.replaceState for client-side navigation — avoids a full
+          // page reload that would re-initialize Auth0Provider and trigger a
+          // second callback attempt causing an infinite spinner loop.
+          const returnTo = appState?.returnTo ?? "/";
+          window.history.replaceState({}, document.title, returnTo);
         }}
         cacheLocation="localstorage"
         useRefreshTokens={false}
