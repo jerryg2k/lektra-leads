@@ -20,6 +20,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
+import { useAuth0 } from "@auth0/auth0-react";
 import { useIsMobile } from "@/hooks/useMobile";
 import { trpc } from "@/lib/trpc";
 import { BarChart3, Building2, Kanban, Layers, LogOut, PanelLeft, Plus, ScanLine, Search, Settings, Upload } from "lucide-react";
@@ -44,6 +45,45 @@ const DEFAULT_WIDTH = 280;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 480;
 
+const IS_AUTH0 = Boolean(import.meta.env.VITE_AUTH0_DOMAIN);
+
+function SignInScreen() {
+  // useAuth0 is always safe to call here because Auth0Provider wraps the whole
+  // app when IS_AUTH0 is true (see main.tsx). When IS_AUTH0 is false this
+  // component is never rendered, so the hook is never called without a provider.
+  const { loginWithRedirect } = IS_AUTH0 ? useAuth0() : { loginWithRedirect: null }; // eslint-disable-line react-hooks/rules-of-hooks
+
+  const handleSignIn = () => {
+    if (loginWithRedirect) {
+      loginWithRedirect({ appState: { returnTo: window.location.pathname } });
+    } else {
+      window.location.href = getLoginUrl();
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
+        <div className="flex flex-col items-center gap-6">
+          <h1 className="text-2xl font-semibold tracking-tight text-center">
+            Sign in to continue
+          </h1>
+          <p className="text-sm text-muted-foreground text-center max-w-sm">
+            Access to this dashboard requires authentication. Continue to launch the login flow.
+          </p>
+        </div>
+        <Button
+          onClick={handleSignIn}
+          size="lg"
+          className="w-full shadow-lg hover:shadow-xl transition-all"
+        >
+          Sign in
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -64,40 +104,7 @@ export default function DashboardLayout({
   }
 
   if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
-          <div className="flex flex-col items-center gap-6">
-            <h1 className="text-2xl font-semibold tracking-tight text-center">
-              Sign in to continue
-            </h1>
-            <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Access to this dashboard requires authentication. Continue to launch the login flow.
-            </p>
-          </div>
-          <Button
-            onClick={() => {
-              // In Auth0 mode, trigger the Auth0 Universal Login flow.
-              // In Manus dev mode, fall back to the legacy OAuth redirect.
-              const auth0Domain = import.meta.env.VITE_AUTH0_DOMAIN;
-              if (auth0Domain) {
-                // Dynamically import to avoid bundling Auth0 in Manus dev mode
-                import("@auth0/auth0-react").then(({ useAuth0: _unused }) => {
-                  // Auth0Provider handles redirect — just navigate to callback trigger
-                  window.location.href = getLoginUrl();
-                });
-              } else {
-                window.location.href = getLoginUrl();
-              }
-            }}
-            size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all"
-          >
-            Sign in
-          </Button>
-        </div>
-      </div>
-    );
+    return <SignInScreen />;
   }
 
   return (
