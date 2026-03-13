@@ -50,9 +50,10 @@ queryClient.getMutationCache().subscribe(event => {
 async function getAuth0AccessToken(): Promise<string | null> {
   if (!IS_AUTH0) return null;
   try {
-    const { getAuth0Client } = await import("./_core/auth0Client");
-    const client = getAuth0Client();
-    if (!client) return null;
+    const { waitForAuth0Client } = await import("./_core/auth0Client");
+    // Wait up to 10s for the Auth0TokenBridge to register getTokenSilently.
+    // This prevents the first batch of tRPC queries from firing without a token.
+    const client = await waitForAuth0Client(10_000);
     return await client.getTokenSilently();
   } catch {
     return null;
