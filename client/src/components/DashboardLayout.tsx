@@ -47,20 +47,25 @@ const MAX_WIDTH = 480;
 
 const IS_AUTH0 = Boolean(import.meta.env.VITE_AUTH0_DOMAIN);
 
-function SignInScreen() {
-  // useAuth0 is always safe to call here because Auth0Provider wraps the whole
-  // app when IS_AUTH0 is true (see main.tsx). When IS_AUTH0 is false this
-  // component is never rendered, so the hook is never called without a provider.
-  const { loginWithRedirect } = IS_AUTH0 ? useAuth0() : { loginWithRedirect: null }; // eslint-disable-line react-hooks/rules-of-hooks
+// Auth0 sign-in screen — only rendered when IS_AUTH0 is true.
+// useAuth0 is called unconditionally inside this component, satisfying Rules of Hooks.
+function Auth0SignInScreen() {
+  const { loginWithRedirect } = useAuth0();
+  return (
+    <SignInScreenUI
+      onSignIn={() =>
+        loginWithRedirect({ appState: { returnTo: window.location.pathname } })
+      }
+    />
+  );
+}
 
-  const handleSignIn = () => {
-    if (loginWithRedirect) {
-      loginWithRedirect({ appState: { returnTo: window.location.pathname } });
-    } else {
-      window.location.href = getLoginUrl();
-    }
-  };
+// Manus sign-in screen — only rendered when IS_AUTH0 is false.
+function ManusSignInScreen() {
+  return <SignInScreenUI onSignIn={() => { window.location.href = getLoginUrl(); }} />;
+}
 
+function SignInScreenUI({ onSignIn }: { onSignIn: () => void }) {
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
@@ -73,7 +78,7 @@ function SignInScreen() {
           </p>
         </div>
         <Button
-          onClick={handleSignIn}
+          onClick={onSignIn}
           size="lg"
           className="w-full shadow-lg hover:shadow-xl transition-all"
         >
@@ -82,6 +87,10 @@ function SignInScreen() {
       </div>
     </div>
   );
+}
+
+function SignInScreen() {
+  return IS_AUTH0 ? <Auth0SignInScreen /> : <ManusSignInScreen />;
 }
 
 export default function DashboardLayout({

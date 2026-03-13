@@ -54,8 +54,14 @@ async function getAuth0AccessToken(): Promise<string | null> {
     // Wait up to 10s for the Auth0TokenBridge to register getTokenSilently.
     // This prevents the first batch of tRPC queries from firing without a token.
     const client = await waitForAuth0Client(10_000);
-    return await client.getTokenSilently();
-  } catch {
+    const token = await client.getTokenSilently();
+    if (!token) {
+      console.warn("[Auth0] getTokenSilently returned empty token");
+    }
+    return token;
+  } catch (err) {
+    // Log the real error so it appears in browser DevTools console
+    console.error("[Auth0] getTokenSilently failed:", err);
     return null;
   }
 }

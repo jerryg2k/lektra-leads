@@ -21,15 +21,19 @@ export function Auth0TokenBridge() {
 
   useEffect(() => {
     // Wrap getAccessTokenSilently to always include the audience.
-    // Without audience, Auth0 returns an opaque token (not a JWT) which
-    // the server's JWKS RS256 verifier cannot validate.
-    const getTokenWithAudience = () =>
-      getAccessTokenSilently({
-        authorizationParams: {
-          audience: AUTH0_AUDIENCE,
-          scope: "openid profile email",
-        },
-      });
+    // IMPORTANT: Only pass audience when it is a non-empty string.
+    // Passing `audience: undefined` explicitly causes Auth0 to return an
+    // opaque token (not a JWT), which the server's JWKS RS256 verifier rejects.
+    const getTokenWithAudience = () => {
+      const authorizationParams: {
+        scope: string;
+        audience?: string;
+      } = { scope: "openid profile email" };
+      if (AUTH0_AUDIENCE) {
+        authorizationParams.audience = AUTH0_AUDIENCE;
+      }
+      return getAccessTokenSilently({ authorizationParams });
+    };
 
     setAuth0Client({ getTokenSilently: getTokenWithAudience });
   }, [getAccessTokenSilently]);
