@@ -114,11 +114,13 @@ function renderApp() {
           scope: "openid profile email",
         }}
         onRedirectCallback={(appState) => {
-          // Use history.replaceState for client-side navigation — avoids a full
-          // page reload that would re-initialize Auth0Provider and trigger a
-          // second callback attempt causing an infinite spinner loop.
+          // Use history.pushState + popstate dispatch so wouter re-renders
+          // after the URL changes. window.location.replace causes a full reload
+          // which re-initializes Auth0Provider and triggers an infinite loop.
           const returnTo = appState?.returnTo ?? "/";
-          window.history.replaceState({}, document.title, returnTo);
+          window.history.pushState({}, document.title, returnTo);
+          // Notify wouter (and any other history listeners) of the URL change
+          window.dispatchEvent(new PopStateEvent("popstate"));
         }}
         cacheLocation="localstorage"
         useRefreshTokens={false}
