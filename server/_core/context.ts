@@ -32,7 +32,7 @@ export async function createContext(
           loginMethod: "manus",
           lastSignedIn: new Date(),
         });
-        user = await getUserByOpenId(sdkUser.openId);
+        user = (await getUserByOpenId(sdkUser.openId)) ?? null;
       }
     }
   } catch {
