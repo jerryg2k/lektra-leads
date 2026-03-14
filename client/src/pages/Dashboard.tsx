@@ -17,6 +17,7 @@ import {
   Flame,
   Layers,
   Loader2,
+  LogOut,
   Mail,
   MessageSquare,
   MoreHorizontal,
@@ -35,11 +36,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 const STAGE_ORDER = ["New", "Contacted", "Qualified", "Closed Won", "Closed Lost"];
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
+  const { logout } = useAuth();
   const { data: pipelineStats, isLoading: statsLoading } = trpc.leads.pipelineStats.useQuery();
   const { data: hotLeads, isLoading: leadsLoading } = trpc.leads.list.useQuery({
     minScore: 60,
@@ -158,6 +161,17 @@ export default function Dashboard() {
             >
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Add Lead</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-border text-xs text-muted-foreground hover:text-destructive hover:border-destructive"
+              onClick={() => logout()}
+              title="Sign out"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Sign Out</span>
             </Button>
           </div>
         </div>
