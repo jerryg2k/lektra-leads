@@ -7,20 +7,13 @@
  * completes, and falls back to a manual redirect if isLoading resolves without
  * a navigation (safety net for edge cases).
  */
-import { useEffect } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 
 export default function Auth0Callback() {
-  const { error, isLoading, isAuthenticated } = useAuth0();
-
-  // Safety net: if Auth0 finishes loading and the user is authenticated but
-  // onRedirectCallback did not fire (e.g. popstate was swallowed), redirect
-  // manually to the dashboard.
-  useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      window.location.replace("/");
-    }
-  }, [isLoading, isAuthenticated]);
+  const { error } = useAuth0();
+  // onRedirectCallback in main.tsx handles navigation via window.location.replace.
+  // No safety-net redirect here — it caused reload loops when isAuthenticated
+  // briefly became true during the normal dashboard load cycle.
 
   if (error) {
     return (

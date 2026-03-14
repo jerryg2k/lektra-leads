@@ -151,12 +151,16 @@ type UseAuthOptions = {
 
 /**
  * Unified auth hook — automatically selects Auth0 or Manus mode based on env.
+ *
+ * IS_AUTH0 is a build-time constant (Vite replaces it at compile time), so
+ * only one branch of code is ever included in the bundle. Both hooks are
+ * defined as separate top-level functions and called unconditionally here,
+ * satisfying React's Rules of Hooks.
  */
 export function useAuth(options?: UseAuthOptions) {
-  // Rules of Hooks: both hooks are always called, but only one path is "active".
-  // This is safe because IS_AUTH0 is a build-time constant that never changes.
-  const auth0Result = IS_AUTH0 ? useAuth0Mode(options) : null;  // eslint-disable-line react-hooks/rules-of-hooks
-  const manusResult = !IS_AUTH0 ? useManusMode(options) : null; // eslint-disable-line react-hooks/rules-of-hooks
-
-  return (IS_AUTH0 ? auth0Result : manusResult)!;
+  // Both hooks are always called unconditionally. IS_AUTH0 is a build-time
+  // constant so only one of these will ever be active in a given build.
+  const auth0Result = useAuth0Mode(options);
+  const manusResult = useManusMode(options);
+  return IS_AUTH0 ? auth0Result : manusResult;
 }
