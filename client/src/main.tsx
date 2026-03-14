@@ -111,26 +111,33 @@ function renderApp() {
   if (IS_AUTH0) {
     // Auth0Provider is statically imported so it is present when the /callback
     // page loads and Auth0 can complete the PKCE code exchange immediately.
+    // Build authorizationParams — only include audience when it is a non-empty
+    // string. Passing audience:undefined causes Auth0 to return an opaque token.
+    const authorizationParams: {
+      redirect_uri: string;
+      scope: string;
+      audience?: string;
+    } = {
+      redirect_uri: `${window.location.origin}/callback`,
+      scope: "openid profile email",
+    };
+    if (AUTH0_AUDIENCE) authorizationParams.audience = AUTH0_AUDIENCE;
+
     root.render(
       <Auth0Provider
         domain={AUTH0_DOMAIN!}
         clientId={AUTH0_CLIENT_ID!}
-        authorizationParams={{
-          redirect_uri: `${window.location.origin}/callback`,
-          audience: AUTH0_AUDIENCE,
-          scope: "openid profile email",
-        }}
+        authorizationParams={authorizationParams}
         onRedirectCallback={(appState) => {
-          // Use history.pushState + popstate dispatch so wouter re-renders
-          // after the URL changes. window.location.replace causes a full reload
-          // which re-initializes Auth0Provider and triggers an infinite loop.
+          // Use window.location.replace so the browser performs a real
+          // navigation. wouter does not reliably respond to manually dispatched
+          // popstate events, so pushState + dispatchEvent was leaving the app
+          // stuck on the /callback spinner.
           const returnTo = appState?.returnTo ?? "/";
-          window.history.pushState({}, document.title, returnTo);
-          // Notify wouter (and any other history listeners) of the URL change
-          window.dispatchEvent(new PopStateEvent("popstate"));
+          window.location.replace(returnTo);
         }}
         cacheLocation="localstorage"
-        useRefreshTokens={false}
+        useRefreshTokens={true}
       >
         <Auth0TokenBridge />
         {AppTree}

@@ -2,14 +2,25 @@
  * Auth0Callback
  *
  * Auth0Provider automatically calls handleRedirectCallback() when it detects
- * a ?code= param in the URL. This component simply waits for that to complete
- * (isLoading → false) and then navigates. The onRedirectCallback prop on
- * Auth0Provider handles the actual navigation via window.location.replace.
+ * a ?code= param in the URL. onRedirectCallback in main.tsx handles navigation
+ * via window.location.replace. This component shows a spinner while that
+ * completes, and falls back to a manual redirect if isLoading resolves without
+ * a navigation (safety net for edge cases).
  */
+import { useEffect } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 
 export default function Auth0Callback() {
-  const { error } = useAuth0();
+  const { error, isLoading, isAuthenticated } = useAuth0();
+
+  // Safety net: if Auth0 finishes loading and the user is authenticated but
+  // onRedirectCallback did not fire (e.g. popstate was swallowed), redirect
+  // manually to the dashboard.
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      window.location.replace("/");
+    }
+  }, [isLoading, isAuthenticated]);
 
   if (error) {
     return (
