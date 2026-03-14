@@ -37,12 +37,13 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const STAGE_ORDER = ["New", "Contacted", "Qualified", "Closed Won", "Closed Lost"];
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { data: pipelineStats, isLoading: statsLoading } = trpc.leads.pipelineStats.useQuery();
   const { data: hotLeads, isLoading: leadsLoading } = trpc.leads.list.useQuery({
     minScore: 60,
@@ -163,6 +164,17 @@ export default function Dashboard() {
               <span className="hidden sm:inline">Add Lead</span>
             </Button>
 
+            {/* User identity + Sign Out */}
+            <div className="hidden sm:flex items-center gap-2 pl-1 border-l border-border ml-1">
+              <Avatar className="h-7 w-7 border border-border shrink-0">
+                <AvatarFallback className="text-[11px] font-semibold bg-primary/10 text-primary">
+                  {user?.name?.charAt(0).toUpperCase() ?? "?"}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-xs font-medium text-foreground max-w-[120px] truncate">
+                {user?.name ?? user?.email ?? ""}
+              </span>
+            </div>
             <Button
               variant="outline"
               size="sm"
