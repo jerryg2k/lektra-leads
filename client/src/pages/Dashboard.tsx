@@ -173,7 +173,11 @@ export default function Dashboard() {
             </Button>
 
             {/* User identity + Sign Out */}
-            <div className="hidden sm:flex items-center gap-2 pl-1 border-l border-border ml-1">
+            <button
+              onClick={() => setLocation("/settings")}
+              className="hidden sm:flex items-center gap-2 pl-1 border-l border-border ml-1 rounded-md px-2 py-1 hover:bg-accent/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              title="Account settings"
+            >
               <Avatar className="h-7 w-7 border border-border shrink-0">
                 {(user as { picture?: string | null })?.picture && <AvatarImage src={(user as { picture?: string | null }).picture!} alt={user?.name ?? "User"} referrerPolicy="no-referrer" />}
                 <AvatarFallback className="text-[11px] font-semibold bg-primary/10 text-primary">
@@ -183,7 +187,7 @@ export default function Dashboard() {
               <span className="text-xs font-medium text-foreground max-w-[120px] truncate">
                 {user?.name ?? user?.email ?? ""}
               </span>
-            </div>
+            </button>
             <Button
               variant="outline"
               size="sm"
