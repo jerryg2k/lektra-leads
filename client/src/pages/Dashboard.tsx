@@ -31,7 +31,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -152,6 +152,7 @@ export default function Dashboard() {
                   <ScanLine className="h-4 w-4 text-muted-foreground" />
                   <span>Batch Scan</span>
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => logout()}
                   className="gap-2 cursor-pointer text-destructive focus:text-destructive"
