@@ -37,7 +37,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const STAGE_ORDER = ["New", "Contacted", "Qualified", "Closed Won", "Closed Lost"];
 
@@ -175,6 +175,7 @@ export default function Dashboard() {
             {/* User identity + Sign Out */}
             <div className="hidden sm:flex items-center gap-2 pl-1 border-l border-border ml-1">
               <Avatar className="h-7 w-7 border border-border shrink-0">
+                {(user as { picture?: string | null })?.picture && <AvatarImage src={(user as { picture?: string | null }).picture!} alt={user?.name ?? "User"} referrerPolicy="no-referrer" />}
                 <AvatarFallback className="text-[11px] font-semibold bg-primary/10 text-primary">
                   {user?.name?.charAt(0).toUpperCase() ?? "?"}
                 </AvatarFallback>

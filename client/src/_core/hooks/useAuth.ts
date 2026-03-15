@@ -48,6 +48,7 @@ function useAuth0Mode(options?: UseAuthOptions) {
       openId: auth0User.sub ?? "",
       name: auth0User.name ?? auth0User.nickname ?? null,
       email: auth0User.email ?? null,
+      picture: auth0User.picture ?? null,      // profile photo from Google/GitHub via Auth0
       loginMethod: auth0User.sub?.split("|")[0] ?? "auth0",
       role: "user" as const,
       createdAt: new Date().toISOString(),
