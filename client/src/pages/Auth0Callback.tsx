@@ -2,18 +2,42 @@
  * Auth0Callback
  *
  * Auth0Provider automatically calls handleRedirectCallback() when it detects
- * a ?code= param in the URL. onRedirectCallback in main.tsx handles navigation
- * via window.location.replace. This component shows a spinner while that
- * completes, and falls back to a manual redirect if isLoading resolves without
- * a navigation (safety net for edge cases).
+ * a ?code= param in the URL. However, the Auth0 SDK's internal cleanup relies
+ * on the `unload` event which Chrome blocks via Permissions-Policy, meaning
+ * onRedirectCallback in main.tsx may never fire.
+ *
+ * This component handles navigation itself: once isLoading resolves and
+ * isAuthenticated is true, it redirects to "/". The guard on
+ * window.location.pathname ensures this effect only fires on the actual
+ * /callback page and never causes a reload loop on other pages.
  */
 import { useAuth0 } from "@auth0/auth0-react";
+import { useEffect } from "react";
 
 export default function Auth0Callback() {
-  const { error } = useAuth0();
-  // onRedirectCallback in main.tsx handles navigation via window.location.replace.
-  // No safety-net redirect here — it caused reload loops when isAuthenticated
-  // briefly became true during the normal dashboard load cycle.
+  const { error, isLoading, isAuthenticated } = useAuth0();
+
+  useEffect(() => {
+    // Only act when we are actually on the /callback route
+    if (window.location.pathname !== "/callback") return;
+    // Wait for Auth0 to finish processing the code exchange
+    if (isLoading) return;
+    // If authenticated, navigate to the dashboard
+    if (isAuthenticated) {
+      window.location.replace("/");
+      return;
+    }
+    // If not authenticated and not loading and no error, give Auth0 a 3s
+    // grace period before giving up and redirecting home
+    if (!error) {
+      const timer = setTimeout(() => {
+        if (window.location.pathname === "/callback") {
+          window.location.replace("/");
+        }
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, isAuthenticated, error]);
 
   if (error) {
     return (
