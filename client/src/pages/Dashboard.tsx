@@ -152,6 +152,13 @@ export default function Dashboard() {
                   <ScanLine className="h-4 w-4 text-muted-foreground" />
                   <span>Batch Scan</span>
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => logout()}
+                  className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Sign Out</span>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
